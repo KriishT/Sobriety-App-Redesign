@@ -2,21 +2,21 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router'; // Add this import
+import { useRouter } from 'expo-router'; 
 
 const games = [
   { id: 1, name: 'Visual Pursuit', category: 'OCULUR ASSESSMENT', time: '2-5 min', icon: 'eye-outline', color: '#3B82F6' },
   { id: 2, name: 'Walk and Turn', category: 'PSYCHOMOTOR', time: '1-2 min', icon: 'walk-outline', color: '#8B5CF6' },
   { id: 3, name: 'Single Leg Stand', category: 'BALANCE CONTROL', time: '30 sec', icon: 'person-outline', color: '#06B6D4' },
   { id: 4, name: 'Choice Reaction', category: 'COGNITIVE', time: '1 min', icon: 'timer-outline', color: '#8B5CF6' },
-  { id: 5, name: 'Memory Check', category: 'COGNITIVE', time: '2 min', icon: 'brain-outline', color: '#8B5CF6' },
+  { id: 5, name: 'DSST', category: 'COGNITIVE', time: '2 min', icon: 'brain-outline', color: '#8B5CF6' },
   { id: 6, name: 'Tongue Twisters', category: 'LINGUISTIC', time: '1 min', icon: 'chatbox-outline', color: '#06B6D4' },
   { id: 7, name: 'Typing Challenge', category: 'MOTOR SKILLS', time: '2 min', icon: 'rocket-outline', color: '#10B981' },
   { id: 8, name: 'Stroop Naming', category: 'COGNITIVE', time: '30 sec', icon: 'text-outline', color: '#3B82F6' },
 ];
 
 export default function Dashboard() {
-  const router = useRouter(); // Add this
+  const router = useRouter(); 
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -40,9 +40,8 @@ export default function Dashboard() {
               key={game.id} 
               style={styles.card}
               onPress={() => {
-                // Navigate to game details with game data
                 router.push({
-                  pathname: '/(tabs)/game-details',
+                  pathname: `/(tabs)/game-details`,
                   params: {
                     name: game.name,
                     category: game.category,
@@ -70,7 +69,6 @@ export default function Dashboard() {
   );
 }
 
-// Styles stay exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

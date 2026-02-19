@@ -8,7 +8,6 @@ export default function GameDetails() {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // Get game info from params (passed from dashboard)
   const gameName = params.name as string || 'Game Title';
   const gameCategory = params.category as string || 'CATEGORY';
   const gameTime = params.time as string || '1-2 min';
@@ -19,7 +18,6 @@ export default function GameDetails() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#1F2937" />
@@ -33,18 +31,15 @@ export default function GameDetails() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Game Icon */}
         <View style={styles.iconSection}>
           <View style={[styles.iconContainer, { backgroundColor: `${gameColor}15` }]}>
             <Ionicons name={gameIcon as any} size={48} color={gameColor} />
           </View>
         </View>
 
-        {/* Game Title */}
         <Text style={styles.gameTitle}>{gameName}</Text>
         <Text style={styles.gameCategory}>{gameCategory}</Text>
 
-        {/* Info Cards */}
         <View style={styles.infoRow}>
           <View style={styles.infoCard}>
             <Text style={styles.infoLabel}>EST. DURATION</Text>
@@ -102,7 +97,18 @@ export default function GameDetails() {
         </View>
 
         {/* Start Button */}
-        <TouchableOpacity style={[styles.startButton, { backgroundColor: gameColor }]}>
+        <TouchableOpacity style={[styles.startButton, { backgroundColor: gameColor }]}   onPress={() => {
+  if (gameName === 'Typing Challenge') {
+    router.push('/(tabs)/(games)/TypingGame/TypingGame');
+  } else if (gameName === 'Stroop Naming') {
+    router.push('/(tabs)/(games)/StroopNaming/StroopNaming');
+  }
+  else if (gameName === 'DSST') {
+    router.push('/(tabs)/(games)/DSST/DSST');
+  }
+}}
+
+>
           <Text style={styles.startButtonText}>Start Protocol</Text>
           <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
         </TouchableOpacity>

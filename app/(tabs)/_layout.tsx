@@ -57,7 +57,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="game-details"
         options={{
-          href: null, // Hide from tab bar
+          href: null, // not needed so hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="(games)"
+        options={{
+          href: null, // not needed so hide from tab bar
         }}
       />
     </Tabs>
