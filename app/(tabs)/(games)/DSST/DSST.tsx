@@ -9,11 +9,14 @@ import { GameTimer } from '@/components/GameTimer';
 
 
 export default function DSST() {
-const [gameStart, setgameStart] = useState(false)
+const [gameStart, setgameStart] = useState(false) 
 const [gameCompleted, setgameCompleted] = useState(false)
 const [score, setScore] = useState(0);
-const [toChoose, setToChoose] = useState(3);
+const [toChoose, setToChoose] = useState(3); // this is the number that user will match based on the grid
 const [totalAttempts, setTotalAttempts] = useState(0);
+
+
+// this page consists of 3 main screens/states of the game -> intro screen/instructions , the main game screen, and the final score/scorecard
 
 
   const router = useRouter();
@@ -35,41 +38,41 @@ const [totalAttempts, setTotalAttempts] = useState(0);
 
 // when the option is clicked, the number is updated
 
-const toChooseupdate = () => {
+const toChooseupdate = () => { // randomize the number to choose
   const randomNum = Math.floor(Math.random() * 6) + 1;
-  setToChoose(randomNum);
+  setToChoose(randomNum); 
 };
 
 const handleAnswerSelect = (selectedNum: number) => {
-  const isCorrect = getSymbol(selectedNum) === getSymbol(toChoose);
+  const isCorrect = getSymbol(selectedNum) === getSymbol(toChoose); 
   
   if (isCorrect) {
     setScore(score + 1);
   }
   
   setTotalAttempts(totalAttempts + 1);
-  toChooseupdate(); // Move to next question
+  toChooseupdate(); // to move to the next question
 };
 
-const handleGameOver = () => {
+const handleGameOver = () => { // when time is up, the game scoreboard is shown through conditionals
   setgameCompleted(true);
   setgameStart(false);
 };
 
-const gameStartState = () => {
+const gameStartState = () => { // initial game state
   setgameStart(true);
   setScore(0);
   setTotalAttempts(0);
-  toChooseupdate(); // Generate first question
+  toChooseupdate(); 
 };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       
-      {!gameStart && !gameCompleted && (
+      {!gameStart && !gameCompleted && ( //if the gamestart and gamecompleted are  false, then game intro screen is shown
     <>
-      {/* Header */}
+     {/*back button*/}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#1F2937" />
@@ -78,7 +81,7 @@ const gameStartState = () => {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Instructions Screen */}
+
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -93,11 +96,9 @@ const gameStartState = () => {
           Match the number to its corresponding symbol as quickly and accurately as possible.
         </Text>
 
-        {/* Example Section */}
         <View style={styles.exampleBox}>
           <Text style={styles.exampleLabel}>How it works:</Text>
 
-          {/* Reference Grid */}
           <Text style={styles.stepTitle}>1. Reference Grid (Top)</Text>
           <View style={styles.referenceGrid}>
             {[1, 2, 3, 4, 5, 6].map((num) => (
@@ -108,7 +109,6 @@ const gameStartState = () => {
             ))}
           </View>
 
-          {/* Stimulus */}
           <Text style={styles.stepTitle}>2. Match This Number (Middle)</Text>
           <View style={styles.stimulusContainer}>
             <View style={styles.stimulusBox}>
@@ -116,7 +116,6 @@ const gameStartState = () => {
             </View>
           </View>
 
-          {/* Answer Choices */}
           <Text style={styles.stepTitle}>3. Select the Correct Symbol (Bottom)</Text>
           <View style={styles.answerGrid}>
             {['&', '@', '#', '$', '%', '^'].map((symbol, idx) => (
@@ -146,7 +145,6 @@ const gameStartState = () => {
           </View>
         </View>
 
-        {/* Rules */}
         <View style={styles.rulesBox}>
           <Text style={styles.rulesTitle}>Test Rules:</Text>
           <View style={styles.rule}>
@@ -169,10 +167,10 @@ const gameStartState = () => {
         </TouchableOpacity>
       </ScrollView>
       </>)}
-
-      {gameStart && !gameCompleted && 
+      
+      
+      {gameStart && !gameCompleted && //if the gamestart is true and gamecompleted is false, then the main gamescreen is shown
       <>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#1F2937" />
@@ -182,7 +180,6 @@ const gameStartState = () => {
         </View>
 
         <View style={styles.gameScreen}>
-          {/* Timer & Score */}
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
               <Ionicons name="time-outline" size={20} color="#8B5CF6" />
@@ -194,7 +191,6 @@ const gameStartState = () => {
             </View>
           </View>
 
-          {/* Reference Grid */}
           <Text style={styles.sectionLabel}>Reference:</Text>
           <View style={styles.referenceGrid}>
             {array.map((num) => (
@@ -205,7 +201,6 @@ const gameStartState = () => {
             ))}
           </View>
 
-          {/* Stimulus */}
           <Text style={styles.sectionLabel}>Match this number:</Text>
           <View style={styles.stimulusContainer}>
             <View style={styles.stimulusBox}>
@@ -213,7 +208,6 @@ const gameStartState = () => {
             </View>
           </View>
 
-          {/* Answer Choices */}
           <Text style={styles.sectionLabel}>Select the symbol:</Text>
           <View style={styles.referenceGrid}>
             {array.map((num) => (
@@ -232,7 +226,7 @@ const gameStartState = () => {
         </View>
       </>}
 
-      {gameCompleted && (
+      {gameCompleted && ( // finally, if the gameCompleted is true, then the final result/scorecard is shown
         <>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>

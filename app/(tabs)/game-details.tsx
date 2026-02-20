@@ -105,8 +105,13 @@ export default function GameDetails() {
   }
   else if (gameName === 'DSST') {
     router.push('/(tabs)/(games)/DSST/DSST');
+  }else if (gameName === 'Choice Reaction') {
+    router.push('/(tabs)/(games)/ChoiceReaction/ChoiceReaction');
+  }else if (gameName === 'Trail Task') {
+    router.push('/(tabs)/(games)/TrailTask/TrailTask');
   }
 }}
+
 
 >
           <Text style={styles.startButtonText}>Start Protocol</Text>

@@ -29,8 +29,7 @@ export const StroopGameGen = () =>{
     [options[i], options[j]] = [options[j], options[i]];
   }
 
-    
-    
+
     return {
         "word":color_word,
         "word_color": color,
