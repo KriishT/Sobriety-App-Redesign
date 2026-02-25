@@ -85,7 +85,8 @@ export default function TypingChallenge() {
   };
 
   const handleBackToDashboard = () => {
-    router.back();
+    startGame();
+    router.replace('/(tabs)/dashboard')
   };
 
   const calculateWPM = () => {

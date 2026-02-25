@@ -38,8 +38,21 @@ export default function ChoiceReaction() {
   const router = useRouter();
 
   const handleBackToDashboard = () => {
-    router.back();
-  };
+    setSquares([
+    { id: 0, color: '#000000' },
+    { id: 1, color: '#000000' },
+    { id: 2, color: '#000000' },
+    { id: 3, color: '#000000' },
+  ]);
+  setGameCompleted(false);
+  setGameStart(false);
+  setActiveSquare(null);
+  setCurrentPhase('waiting');
+  setIsHolding(false);
+  setPressReactionTimes([]);
+  setReleaseReactionTimes([]);
+  router.replace('/(tabs)/dashboard')
+};
 
   const resetSquares = () => {
     setSquares([

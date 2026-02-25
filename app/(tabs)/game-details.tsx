@@ -110,6 +110,14 @@ export default function GameDetails() {
   }else if (gameName === 'Trail Task') {
     router.push('/(tabs)/(games)/TrailTask/TrailTask');
   }
+  else if (gameName === 'Single Leg Stand') {
+    router.push('/(tabs)/(games)/SingleLegStand/SingleLegStand');
+  }
+  else if (gameName === 'Tongue Twisters') {
+    router.push('/(tabs)/(games)/TongueTwister/TongueTwister');
+  }else if (gameName === 'Visual Pursuit') {
+    router.push('/(tabs)/(games)/VisualPursuit/VisualPursuit');
+  }
 }}
 
 

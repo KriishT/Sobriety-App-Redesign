@@ -40,7 +40,14 @@ export default function TrailMaking() {
   const router = useRouter();
 
   const handleBackToDashboard = () => {
-    router.back();
+  setGameStart(false);
+  setGameCompleted(false);
+  setCircles([]);
+  setConnectedLines([]);
+  setCurrentIndex(0);
+  setIsFailed(false);
+
+    router.replace('/(tabs)/dashboard')
   };
 
   // Generate random positions for circles

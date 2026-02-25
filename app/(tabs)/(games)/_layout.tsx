@@ -7,14 +7,6 @@ export default function GamesLayout() {
         headerShown: false,
         animation: 'slide_from_right',
       }}
-    >
-      {/* Stroop Naming Game */}
-      <Stack.Screen 
-        name="StroopNaming/StroopNaming" 
-        options={{
-          title: 'Stroop Naming',
-        }}
-      />
-    </Stack>
+    />
   );
 }

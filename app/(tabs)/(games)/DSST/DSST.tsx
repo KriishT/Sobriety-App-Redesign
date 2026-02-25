@@ -22,7 +22,13 @@ const [totalAttempts, setTotalAttempts] = useState(0);
   const router = useRouter();
 
   const handleBackToDashboard = () => {
-    router.back();
+  setgameStart(false);
+  setgameCompleted(false);
+  setScore(0);
+  setTotalAttempts(0);
+  setToChoose(3);
+  
+ router.replace('/(tabs)/dashboard')
   };
 
   const array = [1, 2, 3, 4, 5, 6]

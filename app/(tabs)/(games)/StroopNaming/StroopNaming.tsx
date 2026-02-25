@@ -47,7 +47,12 @@ export default function StroopNaming() {
   };
 
   const handleBackToDashboard = () => {
-    router.back();
+      setGameOver(false);
+  setGameStarted(false);
+  setScore(0);
+  setTotalAttempts(0);
+
+   router.replace('/(tabs)/dashboard')
   };
 
   return (

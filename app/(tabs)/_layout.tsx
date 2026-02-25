@@ -64,6 +64,7 @@ export default function TabLayout() {
         name="(games)"
         options={{
           href: null, // not needed so hide from tab bar
+          tabBarStyle: { display: 'none' }
         }}
       />
     </Tabs>
