@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -36,18 +36,33 @@ export default function TrailMaking() {
   const [startTime, setStartTime] = useState<number>(0);
   const [completionTime, setCompletionTime] = useState<number>(0);
   const [isFailed, setIsFailed] = useState(false);
+  
+  // Finger tracking
+  const [fingerDown, setFingerDown] = useState(false);
+  const [fingerPath, setFingerPath] = useState<{ x: number; y: number }[]>([]);
+  const [lastTouchedCircle, setLastTouchedCircle] = useState<number | null>(null);
 
   const router = useRouter();
 
-  const handleBackToDashboard = () => {
-  setGameStart(false);
-  setGameCompleted(false);
-  setCircles([]);
-  setConnectedLines([]);
-  setCurrentIndex(0);
-  setIsFailed(false);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // No cleanup needed for this game
+    };
+  }, []);
 
-    router.replace('/(tabs)/dashboard')
+  const handleBackToDashboard = () => {
+    setGameStart(false);
+    setGameCompleted(false);
+    setCircles([]);
+    setConnectedLines([]);
+    setCurrentIndex(0);
+    setIsFailed(false);
+    setFingerDown(false);
+    setFingerPath([]);
+    setLastTouchedCircle(null);
+
+    router.replace('/(tabs)/dashboard');
   };
 
   // Generate random positions for circles
@@ -99,22 +114,25 @@ export default function TrailMaking() {
       
       setCurrentIndex(currentIndex + 1);
       
-      // Check if completed
+      // Check if completed ALL circles
       if (currentIndex === circles.length - 1) {
         const endTime = Date.now();
         setCompletionTime(Math.round((endTime - startTime) / 1000));
         setGameCompleted(true);
         setGameStart(false);
         setIsFailed(false);
+        setFingerDown(false);
       }
-    } else {
-      // ❌ WRONG - INSTANT FAIL
+    } else if (circle.sequenceIndex > currentIndex) {
+      // ❌ WRONG - skipped a circle
       const endTime = Date.now();
       setCompletionTime(Math.round((endTime - startTime) / 1000));
       setGameCompleted(true);
       setGameStart(false);
       setIsFailed(true);
+      setFingerDown(false);
     }
+    // Ignore if already completed circle
   };
 
   const gameStartState = () => {
@@ -126,13 +144,9 @@ export default function TrailMaking() {
     setGameStart(true);
     setGameCompleted(false);
     setIsFailed(false);
-  };
-
-  const getNextLabel = () => {
-    if (currentIndex < circles.length) {
-      return TRAIL_SEQUENCE[currentIndex];
-    }
-    return '';
+    setFingerDown(false);
+    setFingerPath([]);
+    setLastTouchedCircle(null);
   };
 
   return (
@@ -161,7 +175,7 @@ export default function TrailMaking() {
             <Text style={styles.instructionTitle}>Trail Making Task</Text>
             
             <Text style={styles.instructionText}>
-              Connect the circles in order, alternating between numbers and letters: 1 → A → 2 → B → 3 → C...
+              Connect the circles in order by drawing a continuous line. Do not lift your finger!
             </Text>
 
             {/* Example Section */}
@@ -194,7 +208,7 @@ export default function TrailMaking() {
               <View style={styles.exampleNote}>
                 <Ionicons name="information-circle" size={20} color="#F59E0B" />
                 <Text style={styles.exampleNoteText}>
-                  Tap circles in order. A yellow trail will show your path.
+                  Draw one continuous line through all circles in order
                 </Text>
               </View>
             </View>
@@ -212,7 +226,11 @@ export default function TrailMaking() {
               </View>
               <View style={styles.rule}>
                 <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>⚠️ ONE WRONG TAP = TEST FAILS IMMEDIATELY</Text>
+                <Text style={styles.ruleText}>⚠️ Keep finger down - lifting finger = TEST FAILS</Text>
+              </View>
+              <View style={styles.rule}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.ruleText}>Draw a continuous trail through all circles</Text>
               </View>
               <View style={styles.rule}>
                 <View style={styles.bulletPoint} />
@@ -247,14 +265,57 @@ export default function TrailMaking() {
                 <Text style={styles.statText}>{currentIndex} / {circles.length}</Text>
               </View>
               <View style={styles.instructionCard}>
-                <Text style={styles.nextLabel}>Next: <Text style={styles.nextValue}>{getNextLabel()}</Text></Text>
+                <Text style={styles.instructionCardText}>Draw a continuous line without lifting your finger</Text>
               </View>
             </View>
 
             {/* Canvas */}
-            <View style={styles.canvasContainer}>
+            <View 
+              style={styles.canvasContainer}
+              onTouchStart={(e) => {
+                setFingerDown(true);
+                const touch = e.nativeEvent.touches[0];
+                setFingerPath([{ x: touch.locationX, y: touch.locationY }]);
+              }}
+              onTouchMove={(e) => {
+                if (!fingerDown) return;
+                
+                const touch = e.nativeEvent.touches[0];
+                const newPoint = { x: touch.locationX, y: touch.locationY };
+                
+                setFingerPath(prev => [...prev, newPoint]);
+                
+                // Check if finger is over a circle
+                circles.forEach(circle => {
+                  const distance = Math.sqrt(
+                    Math.pow(circle.x - touch.locationX, 2) + 
+                    Math.pow(circle.y - touch.locationY, 2)
+                  );
+                  
+                  if (distance <= 30) { // Circle radius
+                    // Only process if this is a new circle touch
+                    if (lastTouchedCircle !== circle.sequenceIndex) {
+                      setLastTouchedCircle(circle.sequenceIndex);
+                      handleCirclePress(circle);
+                    }
+                  }
+                });
+              }}
+              onTouchEnd={() => {
+                if (fingerDown && currentIndex < circles.length) {
+                  // User lifted finger before completing - FAIL
+                  const endTime = Date.now();
+                  setCompletionTime(Math.round((endTime - startTime) / 1000));
+                  setGameCompleted(true);
+                  setGameStart(false);
+                  setIsFailed(true);
+                }
+                setFingerDown(false);
+                setFingerPath([]);
+              }}
+            >
               <Svg width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={styles.svg}>
-                {/* Draw lines */}
+                {/* Draw permanent connected lines */}
                 {connectedLines.map((line, index) => (
                   <Line
                     key={`line-${index}`}
@@ -267,10 +328,27 @@ export default function TrailMaking() {
                   />
                 ))}
 
-                {/* Draw circles */}
+                {/* Draw finger trail */}
+                {fingerPath.length > 1 && fingerPath.map((point, index) => {
+                  if (index === 0) return null;
+                  const prevPoint = fingerPath[index - 1];
+                  return (
+                    <Line
+                      key={`trail-${index}`}
+                      x1={prevPoint.x}
+                      y1={prevPoint.y}
+                      x2={point.x}
+                      y2={point.y}
+                      stroke="#FCD34D"
+                      strokeWidth={4}
+                      opacity={0.6}
+                    />
+                  );
+                })}
+
+                {/* Draw circles - NO HIGHLIGHTING */}
                 {circles.map((circle) => {
                   const isCompleted = circle.sequenceIndex < currentIndex;
-                  const isCurrent = circle.sequenceIndex === currentIndex;
                   
                   return (
                     <SvgCircle
@@ -279,8 +357,8 @@ export default function TrailMaking() {
                       cy={circle.y}
                       r={30}
                       fill={isCompleted ? '#EAB308' : '#FFFFFF'}
-                      stroke={isCurrent ? '#F59E0B' : '#D1D5DB'}
-                      strokeWidth={isCurrent ? 4 : 2}
+                      stroke="#D1D5DB"
+                      strokeWidth={2}
                     />
                   );
                 })}
@@ -304,24 +382,14 @@ export default function TrailMaking() {
                   );
                 })}
               </Svg>
+            </View>
 
-              {/* Invisible touchable layer */}
-              <View style={styles.touchableLayer}>
-                {circles.map((circle) => (
-                  <TouchableOpacity
-                    key={`touch-${circle.id}`}
-                    style={[
-                      styles.touchableCircle,
-                      {
-                        left: circle.x - 30,
-                        top: circle.y - 30,
-                      },
-                    ]}
-                    onPress={() => handleCirclePress(circle)}
-                    activeOpacity={0.7}
-                  />
-                ))}
-              </View>
+            {/* Instruction */}
+            <View style={styles.fingerInstruction}>
+              <Ionicons name="hand-left-outline" size={24} color="#F59E0B" />
+              <Text style={styles.fingerInstructionText}>
+                {fingerDown ? 'Keep drawing...' : 'Touch and drag to connect circles'}
+              </Text>
             </View>
           </View>
         </>
@@ -356,7 +424,9 @@ export default function TrailMaking() {
             <Text style={styles.resultSubtitle}>
               {!isFailed 
                 ? 'You completed the trail without errors!' 
-                : 'You tapped the wrong circle'}
+                : isFailed && currentIndex < circles.length 
+                  ? 'You lifted your finger too early' 
+                  : 'You tapped the wrong circle'}
             </Text>
 
             <View style={styles.scoreCard}>
@@ -590,22 +660,20 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   instructionCard: {
+    flex: 1,
     backgroundColor: '#FEF3C7',
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#F59E0B',
+    marginLeft: 12,
   },
-  nextLabel: {
-    fontSize: 14,
+  instructionCardText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#92400E',
-  },
-  nextValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#F59E0B',
+    textAlign: 'center',
   },
   canvasContainer: {
     flex: 1,
@@ -618,15 +686,22 @@ const styles = StyleSheet.create({
   svg: {
     backgroundColor: '#FAFAFA',
   },
-  touchableLayer: {
-    position: 'absolute',
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
+  fingerInstruction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    borderWidth: 2,
+    borderColor: '#F59E0B',
   },
-  touchableCircle: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
+  fingerInstructionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginLeft: 12,
   },
 
   // RESULT SCREEN

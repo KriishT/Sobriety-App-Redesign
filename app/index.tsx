@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 
@@ -10,12 +10,10 @@ export default function Index() {
       <StatusBar style="dark" />
       
       <View style={styles.iconContainer}>
-        <View style={styles.icon}>
-          <Text style={styles.iconText}>🛡️</Text>
-        </View>
+        <Image source={require('../assets/images/impairmate-logo.jpg')} style={styles.icon} />
       </View>
 
-      <Text style={styles.title}>Sobriety</Text>
+      <Text style={styles.title}>ImpairMate</Text>
       
       <Text style={styles.subtitle}>
         Sobriety Field Tests the right way!

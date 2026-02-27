@@ -4,17 +4,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
-import { GameTimer } from '@/components/GameTimer';
 
 const { width } = Dimensions.get('window');
 const BALL_SIZE = 40;
 const CANVAS_WIDTH = width - 40;
 const CANVAS_HEIGHT = 400;
+const HORIZONTAL_DURATION = 10; // 10 seconds horizontal
+const PAUSE_DURATION = 5; // 5 seconds pause
+const VERTICAL_DURATION = 10; // 10 seconds vertical
+
+type TestPhase = 'camera-horizontal' | 'horizontal' | 'pause' | 'camera-vertical' | 'vertical' | 'complete';
 
 export default function VisualPursuit() {
   const [gameStart, setGameStart] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraOrientation, setCameraOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [testPhase, setTestPhase] = useState<TestPhase>('camera-horizontal');
   
   // Ball animation state
   const [ballPosition, setBallPosition] = useState({ x: 50, y: CANVAS_HEIGHT / 2 });
@@ -30,16 +36,19 @@ export default function VisualPursuit() {
   const animationRef = useRef<any>(null);
   const router = useRouter();
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        clearInterval(animationRef.current);
+      }
+    };
+  }, []);
+
   const handleBackToDashboard = () => {
     if (animationRef.current) {
       clearInterval(animationRef.current);
     }
-    setGameStart(false);
-    setGameCompleted(false);
-    setShowCamera(false);
-    setBallPosition({ x: 50, y: CANVAS_HEIGHT / 2 });
-    setDirection('horizontal');
-
     router.replace('/(tabs)/dashboard');
   };
 
@@ -50,13 +59,15 @@ export default function VisualPursuit() {
           let newX = prev.x;
           
           if (movingRight) {
-            newX += 3;
+            newX += 4;
             if (newX >= CANVAS_WIDTH - BALL_SIZE) {
+              newX = CANVAS_WIDTH - BALL_SIZE; // Clamp to edge
               setMovingRight(false);
             }
           } else {
-            newX -= 3;
+            newX -= 4;
             if (newX <= 0) {
+              newX = 0; // Clamp to edge
               setMovingRight(true);
             }
           }
@@ -67,13 +78,15 @@ export default function VisualPursuit() {
           let newY = prev.y;
           
           if (movingDown) {
-            newY += 3;
+            newY += 4;
             if (newY >= CANVAS_HEIGHT - BALL_SIZE) {
+              newY = CANVAS_HEIGHT - BALL_SIZE; // Clamp to edge
               setMovingDown(false);
             }
           } else {
-            newY -= 3;
+            newY -= 4;
             if (newY <= 0) {
+              newY = 0; // Clamp to edge
               setMovingDown(true);
             }
           }
@@ -86,26 +99,55 @@ export default function VisualPursuit() {
 
   const gameStartState = () => {
     setShowCamera(true);
+    setCameraOrientation('horizontal');
+    setTestPhase('camera-horizontal');
     
-    // Simulate camera opening for 2 seconds
+    // Phase 1: Horizontal camera alignment (2 seconds)
     setTimeout(() => {
       setShowCamera(false);
       setGameStart(true);
       setGameCompleted(false);
+      setTestPhase('horizontal');
       
-      // Start with horizontal movement
+      // Start horizontal ball movement
       setDirection('horizontal');
       setBallPosition({ x: 50, y: CANVAS_HEIGHT / 2 });
       setMovingRight(true);
       
       startBallAnimation();
       
-      // Switch to vertical after 15 seconds
+      // Phase 2: After 10 seconds, pause for realignment
       setTimeout(() => {
-        setDirection('vertical');
-        setBallPosition({ x: CANVAS_WIDTH / 2, y: 50 });
-        setMovingDown(true);
-      }, 15000);
+        if (animationRef.current) {
+          clearInterval(animationRef.current);
+        }
+        setTestPhase('pause');
+        
+        // Phase 3: After 5 second pause, show vertical camera alignment
+        setTimeout(() => {
+          setShowCamera(true);
+          setCameraOrientation('vertical');
+          setTestPhase('camera-vertical');
+          
+          // Phase 4: After 2 seconds, start vertical test
+          setTimeout(() => {
+            setShowCamera(false);
+            setTestPhase('vertical');
+            
+            // Start vertical ball movement
+            setDirection('vertical');
+            setBallPosition({ x: CANVAS_WIDTH / 2, y: 50 });
+            setMovingDown(true);
+            
+            startBallAnimation();
+            
+            // Phase 5: After 10 seconds, complete
+            setTimeout(() => {
+              handleGameOver();
+            }, VERTICAL_DURATION * 1000);
+          }, 2000);
+        }, PAUSE_DURATION * 1000);
+      }, HORIZONTAL_DURATION * 1000);
     }, 2000);
   };
 
@@ -157,28 +199,28 @@ export default function VisualPursuit() {
                   <View style={styles.stepNumber}>
                     <Text style={styles.stepNumberText}>1</Text>
                   </View>
-                  <Text style={styles.stepText}>Position your face in front of camera</Text>
+                  <Text style={styles.stepText}>Position your face in front of camera (horizontal)</Text>
                 </View>
 
                 <View style={styles.step}>
                   <View style={styles.stepNumber}>
                     <Text style={styles.stepNumberText}>2</Text>
                   </View>
-                  <Text style={styles.stepText}>Follow the yellow ball with your eyes (15 seconds horizontal)</Text>
+                  <Text style={styles.stepText}>Follow the yellow ball horizontally (10 seconds)</Text>
                 </View>
 
                 <View style={styles.step}>
                   <View style={styles.stepNumber}>
                     <Text style={styles.stepNumberText}>3</Text>
                   </View>
-                  <Text style={styles.stepText}>Continue following (15 seconds vertical)</Text>
+                  <Text style={styles.stepText}>Rotate phone to vertical (5 second pause)</Text>
                 </View>
 
                 <View style={styles.step}>
                   <View style={styles.stepNumber}>
                     <Text style={styles.stepNumberText}>4</Text>
                   </View>
-                  <Text style={styles.stepText}>Keep your head still throughout the test</Text>
+                  <Text style={styles.stepText}>Follow the ball vertically (10 seconds)</Text>
                 </View>
               </View>
 
@@ -195,7 +237,7 @@ export default function VisualPursuit() {
               <Text style={styles.rulesTitle}>Test Rules:</Text>
               <View style={styles.rule}>
                 <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Total duration: 30 seconds</Text>
+                <Text style={styles.ruleText}>Total duration: ~27 seconds</Text>
               </View>
               <View style={styles.rule}>
                 <View style={styles.bulletPoint} />
@@ -224,24 +266,38 @@ export default function VisualPursuit() {
         <View style={styles.cameraScreen}>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
-              <Ionicons name="chevron-back" size={24} color="#1F2937" />
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Visual Pursuit</Text>
+            <Text style={[styles.headerTitle, { color: '#FFFFFF' }]}>Visual Pursuit</Text>
             <View style={styles.placeholder} />
           </View>
 
           <View style={styles.cameraContainer}>
-            <View style={styles.faceOutline}>
+            <View style={[
+              styles.faceOutline,
+              cameraOrientation === 'vertical' && styles.faceOutlineVertical
+            ]}>
               <Ionicons name="happy-outline" size={120} color="#6366F1" />
             </View>
-            <Text style={styles.cameraText}>Position your face in the frame</Text>
-            <Text style={styles.cameraSubtext}>Starting in 2 seconds...</Text>
+            <Text style={styles.cameraText}>
+              {cameraOrientation === 'horizontal' 
+                ? 'Hold phone horizontally (landscape)' 
+                : 'Hold phone vertically (portrait)'}
+            </Text>
+            <Text style={styles.cameraSubtext}>Position your face in the frame</Text>
+            <View style={styles.orientationIndicator}>
+              <Ionicons 
+                name={cameraOrientation === 'horizontal' ? 'phone-landscape-outline' : 'phone-portrait-outline'} 
+                size={48} 
+                color="#6366F1" 
+              />
+            </View>
           </View>
         </View>
       )}
 
       {/* GAME SCREEN */}
-      {gameStart && !gameCompleted && (
+      {gameStart && !gameCompleted && !showCamera && (
         <>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
@@ -251,52 +307,69 @@ export default function VisualPursuit() {
             <View style={styles.placeholder} />
           </View>
 
-          <View style={styles.gameScreen}>
-            {/* Timer & Direction */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Ionicons name="time-outline" size={20} color="#6366F1" />
-                <GameTimer time={30} onTimeUp={handleGameOver} />
+          {/* PAUSE SCREEN */}
+          {testPhase === 'pause' && (
+            <View style={styles.pauseScreen}>
+              <View style={styles.pauseCard}>
+                <Ionicons name="sync-outline" size={80} color="#6366F1" />
+                <Text style={styles.pauseTitle}>Rotate Your Phone</Text>
+                <Text style={styles.pauseSubtitle}>
+                  Please rotate your phone to vertical (portrait) orientation
+                </Text>
+                <View style={styles.pauseTimer}>
+                  <Ionicons name="time-outline" size={24} color="#6366F1" />
+                  <Text style={styles.pauseTimerText}>Resuming in {PAUSE_DURATION} seconds...</Text>
+                </View>
+                <Ionicons name="phone-portrait-outline" size={64} color="#6366F1" style={{ marginTop: 20 }} />
               </View>
-              <View style={styles.directionCard}>
-                <Ionicons 
-                  name={direction === 'horizontal' ? 'resize-outline' : 'swap-vertical-outline'} 
-                  size={20} 
-                  color="#6366F1" 
-                />
-                <Text style={styles.directionText}>
-                  {direction === 'horizontal' ? 'Horizontal' : 'Vertical'}
+            </View>
+          )}
+
+          {/* ACTIVE TEST SCREEN */}
+          {(testPhase === 'horizontal' || testPhase === 'vertical') && (
+            <View style={styles.gameScreen}>
+              {/* Stats */}
+              <View style={styles.statsContainer}>
+                <View style={styles.directionCard}>
+                  <Ionicons 
+                    name={direction === 'horizontal' ? 'resize-outline' : 'swap-vertical-outline'} 
+                    size={20} 
+                    color="#6366F1" 
+                  />
+                  <Text style={styles.directionText}>
+                    {direction === 'horizontal' ? 'Horizontal Test' : 'Vertical Test'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Instructions */}
+              <View style={styles.instructionCard}>
+                <Ionicons name="eye-outline" size={24} color="#6366F1" />
+                <Text style={styles.gameInstruction}>
+                  Follow the ball with your eyes only. Keep your head still!
                 </Text>
               </View>
-            </View>
 
-            {/* Instructions */}
-            <View style={styles.instructionCard}>
-              <Ionicons name="eye-outline" size={24} color="#6366F1" />
-              <Text style={styles.gameInstruction}>
-                Follow the ball with your eyes only. Keep your head still!
-              </Text>
-            </View>
+              {/* Ball Animation Canvas */}
+              <View style={styles.canvas}>
+                <View 
+                  style={[
+                    styles.ball,
+                    {
+                      left: ballPosition.x,
+                      top: ballPosition.y,
+                    }
+                  ]} 
+                />
+              </View>
 
-            {/* Ball Animation Canvas */}
-            <View style={styles.canvas}>
-              <View 
-                style={[
-                  styles.ball,
-                  {
-                    left: ballPosition.x,
-                    top: ballPosition.y,
-                  }
-                ]} 
-              />
+              {/* Camera indicator */}
+              <View style={styles.cameraIndicator}>
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingText}>Recording</Text>
+              </View>
             </View>
-
-            {/* Camera indicator */}
-            <View style={styles.cameraIndicator}>
-              <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>Recording</Text>
-            </View>
-          </View>
+          )}
         </>
       )}
 
@@ -341,7 +414,7 @@ export default function VisualPursuit() {
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Text style={styles.statItemLabel}>Duration</Text>
-                  <Text style={styles.statItemValue}>30s</Text>
+                  <Text style={styles.statItemValue}>27s</Text>
                 </View>
                 <View style={styles.statItemDivider} />
                 <View style={styles.statItem}>
@@ -592,15 +665,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
+  faceOutlineVertical: {
+    transform: [{ rotate: '90deg' }],
+  },
   cameraText: {
     fontSize: 20,
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 12,
+    textAlign: 'center',
   },
   cameraSubtext: {
     fontSize: 16,
     color: '#9CA3AF',
+  },
+  orientationIndicator: {
+    marginTop: 30,
+    padding: 20,
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    borderRadius: 12,
+  },
+
+  // PAUSE SCREEN
+  pauseScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#FAFAFA',
+  },
+  pauseCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#6366F1',
+    maxWidth: 400,
+  },
+  pauseTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  pauseSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  pauseTimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  pauseTimerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4338CA',
   },
 
   // GAME SCREEN
@@ -610,18 +738,8 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginBottom: 20,
-  },
-  statCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   directionCard: {
     flexDirection: 'row',
