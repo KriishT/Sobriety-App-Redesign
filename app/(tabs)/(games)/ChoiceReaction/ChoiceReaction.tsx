@@ -1,10 +1,10 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
 import { GameTimer } from '@/components/GameTimer';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Square = {
   id: number;
@@ -34,10 +34,25 @@ export default function ChoiceReaction() {
   // Timing
   const blueStartTime = useRef<number>(0);
   const redStartTime = useRef<number>(0);
+  const missedBlueTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasRespondedToBlueRef = useRef(false);
+
+  const BLUE_MAX_MS = 2000; // If user doesn't press blue within this time, count as error and go to next round
+  const BLUE_COLOR = '#3B82F6';
+  const BLUE_PRESSED_COLOR = '#1D4ED8'; // Darker blue when holding
 
   const router = useRouter();
 
   const handleBackToDashboard = () => {
+    if (missedBlueTimeoutRef.current) {
+      clearTimeout(missedBlueTimeoutRef.current);
+      missedBlueTimeoutRef.current = null;
+    }
+    if (redDelayTimeoutRef.current) {
+      clearTimeout(redDelayTimeoutRef.current);
+      redDelayTimeoutRef.current = null;
+    }
     setSquares([
     { id: 0, color: '#000000' },
     { id: 1, color: '#000000' },
@@ -64,10 +79,19 @@ export default function ChoiceReaction() {
   };
 
   const startNewRound = () => {
+    if (missedBlueTimeoutRef.current) {
+      clearTimeout(missedBlueTimeoutRef.current);
+      missedBlueTimeoutRef.current = null;
+    }
+    if (redDelayTimeoutRef.current) {
+      clearTimeout(redDelayTimeoutRef.current);
+      redDelayTimeoutRef.current = null;
+    }
     resetSquares();
     setActiveSquare(null);
     setIsHolding(false);
     setCurrentPhase('waiting');
+    hasRespondedToBlueRef.current = false;
     
     // Random delay before showing blue (500ms - 2000ms)
     const delay = Math.random() * 1500 + 500;
@@ -76,25 +100,49 @@ export default function ChoiceReaction() {
       const randomSquare = Math.floor(Math.random() * 4);
       setActiveSquare(randomSquare);
       setCurrentPhase('blue');
+      hasRespondedToBlueRef.current = false;
       blueStartTime.current = Date.now();
       
       // Update square color
       setSquares(prev => prev.map(sq => 
-        sq.id === randomSquare ? { ...sq, color: '#3B82F6' } : sq
+        sq.id === randomSquare ? { ...sq, color: BLUE_COLOR } : sq
       ));
+
+      // If user doesn't press blue within BLUE_MAX_MS, count as error and go to next round (not in avg press reaction)
+      missedBlueTimeoutRef.current = setTimeout(() => {
+        missedBlueTimeoutRef.current = null;
+        setErrors(prev => prev + 1);
+        startNewRound();
+      }, BLUE_MAX_MS);
     }, delay);
   };
 
   const handleSquarePressIn = (id: number) => {
-    if (currentPhase === 'blue' && id === activeSquare && !isHolding) {
-      // Correct square pressed during blue phase
+    if (currentPhase === 'blue' && id === activeSquare) {
+      if (hasRespondedToBlueRef.current) {
+        // Press again after already responding (e.g. pressed then released) – count as error and move on
+        if (redDelayTimeoutRef.current) {
+          clearTimeout(redDelayTimeoutRef.current);
+          redDelayTimeoutRef.current = null;
+        }
+        setErrors(prev => prev + 1);
+        startNewRound();
+        return;
+      }
+      // First press on blue – cancel "missed blue" timeout
+      hasRespondedToBlueRef.current = true;
+      if (missedBlueTimeoutRef.current) {
+        clearTimeout(missedBlueTimeoutRef.current);
+        missedBlueTimeoutRef.current = null;
+      }
       const reactionTime = Date.now() - blueStartTime.current;
       setPressReactionTimes(prev => [...prev, reactionTime]);
       setIsHolding(true);
       
       // Change to red after 500ms - 1500ms
       const redDelay = Math.random() * 1000 + 500;
-      setTimeout(() => {
+      redDelayTimeoutRef.current = setTimeout(() => {
+        redDelayTimeoutRef.current = null;
         setCurrentPhase('red');
         redStartTime.current = Date.now();
         setSquares(prev => prev.map(sq => 
@@ -102,7 +150,6 @@ export default function ChoiceReaction() {
         ));
       }, redDelay);
     } else if (currentPhase !== 'waiting') {
-      // Wrong square pressed
       setErrors(prev => prev + 1);
     }
   };
@@ -113,13 +160,17 @@ export default function ChoiceReaction() {
       const reactionTime = Date.now() - redStartTime.current;
       setReleaseReactionTimes(prev => [...prev, reactionTime]);
       
-      // Start new round after brief delay
       setTimeout(() => {
         startNewRound();
       }, 500);
     } else if (isHolding && currentPhase === 'blue') {
-      // Released too early (during blue)
+      // Released before it turned red – count as error, cancel red transition, go to next round
+      if (redDelayTimeoutRef.current) {
+        clearTimeout(redDelayTimeoutRef.current);
+        redDelayTimeoutRef.current = null;
+      }
       setErrors(prev => prev + 1);
+      setIsHolding(false);
       setTimeout(() => {
         startNewRound();
       }, 500);
@@ -269,19 +320,11 @@ export default function ChoiceReaction() {
           </View>
 
           <View style={styles.gameScreen}>
-            {/* Timer & Stats */}
+            {/* Timer only – no accuracy/correct/error counts during play (study-friendly) */}
             <View style={styles.statsContainer}>
               <View style={styles.statCard}>
                 <Ionicons name="time-outline" size={20} color="#10B981" />
                 <GameTimer time={30} onTimeUp={handleGameOver} />
-              </View>
-              <View style={styles.statCard}>
-                <Ionicons name="flash-outline" size={20} color="#10B981" />
-                <Text style={styles.statText}>{totalReactions}</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
-                <Text style={styles.statText}>{errors}</Text>
               </View>
             </View>
 
@@ -298,7 +341,15 @@ export default function ChoiceReaction() {
                 {squares.slice(0, 2).map((square) => (
                   <Pressable
                     key={square.id}
-                    style={[styles.gameSquare, { backgroundColor: square.color }]}
+                    style={[
+                      styles.gameSquare,
+                      {
+                        backgroundColor:
+                          square.id === activeSquare && currentPhase === 'blue' && isHolding
+                            ? BLUE_PRESSED_COLOR
+                            : square.color,
+                      },
+                    ]}
                     onPressIn={() => handleSquarePressIn(square.id)}
                     onPressOut={() => handleSquarePressOut(square.id)}
                   />
@@ -308,7 +359,15 @@ export default function ChoiceReaction() {
                 {squares.slice(2, 4).map((square) => (
                   <Pressable
                     key={square.id}
-                    style={[styles.gameSquare, { backgroundColor: square.color }]}
+                    style={[
+                      styles.gameSquare,
+                      {
+                        backgroundColor:
+                          square.id === activeSquare && currentPhase === 'blue' && isHolding
+                            ? BLUE_PRESSED_COLOR
+                            : square.color,
+                      },
+                    ]}
                     onPressIn={() => handleSquarePressIn(square.id)}
                     onPressOut={() => handleSquarePressOut(square.id)}
                   />

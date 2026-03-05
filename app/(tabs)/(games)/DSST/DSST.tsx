@@ -3,51 +3,55 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import {getSymbol} from '@/logic/SymbolMap';
+import { getSymbol } from '@/logic/SymbolMap';
 import { useState, useEffect } from 'react';
 import { GameTimer } from '@/components/GameTimer';
 
+const BASE_ARRAY = [1, 2, 3, 4, 5, 6];
 
 export default function DSST() {
-const [gameStart, setgameStart] = useState(false) 
-const [gameCompleted, setgameCompleted] = useState(false)
-const [score, setScore] = useState(0);
-const [toChoose, setToChoose] = useState(3); // this is the number that user will match based on the grid
-const [totalAttempts, setTotalAttempts] = useState(0);
+  const [gameStart, setgameStart] = useState(false);
+  const [gameCompleted, setgameCompleted] = useState(false);
+  const [score, setScore] = useState(0);
+  const [toChoose, setToChoose] = useState(3); // this is the number that user will match based on the grid
+  const [totalAttempts, setTotalAttempts] = useState(0);
+  const [answerOrder, setAnswerOrder] = useState<number[]>(BASE_ARRAY); // randomized order for bottom symbols
 
-
-// this page consists of 3 main screens/states of the game -> intro screen/instructions , the main game screen, and the final score/scorecard
-
+  // this page consists of 3 main screens/states of the game -> intro screen/instructions , the main game screen, and the final score/scorecard
 
   const router = useRouter();
 
   const handleBackToDashboard = () => {
-  setgameStart(false);
-  setgameCompleted(false);
-  setScore(0);
-  setTotalAttempts(0);
-  setToChoose(3);
-  
- router.replace('/(tabs)/dashboard')
+    setgameStart(false);
+    setgameCompleted(false);
+    setScore(0);
+    setTotalAttempts(0);
+    setToChoose(3);
+    setAnswerOrder(BASE_ARRAY);
+
+    router.replace('/(tabs)/dashboard');
   };
 
-  const array = [1, 2, 3, 4, 5, 6]
+  const array = BASE_ARRAY;
 
-//again here we use fisher-yates to randomize the option grid
-//   const arrayShuffle = (array: number[]) => {
-//     for (let i = array.length - 1; i > 0; i--) {
-//       const j = Math.floor(Math.random() * (i + 1));
-//       [array[i], array[j]] = [array[j], array[i]];
-//   }
-//   return array;
-// }
+  const shuffleArray = (source: number[]) => {
+    const arr = [...source];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
 
-// when the option is clicked, the number is updated
+  // when the option is clicked, the number is updated
 
-const toChooseupdate = () => { // randomize the number to choose
-  const randomNum = Math.floor(Math.random() * 6) + 1;
-  setToChoose(randomNum); 
-};
+  const toChooseupdate = () => {
+    // randomize the number to choose
+    const randomNum = Math.floor(Math.random() * 6) + 1;
+    setToChoose(randomNum);
+    // randomize the order of symbols shown at the bottom
+    setAnswerOrder(shuffleArray(BASE_ARRAY));
+  };
 
 const handleAnswerSelect = (selectedNum: number) => {
   const isCorrect = getSymbol(selectedNum) === getSymbol(toChoose); 
@@ -216,7 +220,7 @@ const gameStartState = () => { // initial game state
 
           <Text style={styles.sectionLabel}>Select the symbol:</Text>
           <View style={styles.referenceGrid}>
-            {array.map((num) => (
+            {answerOrder.map((num) => (
               <TouchableOpacity 
                 key={num} 
                 style={styles.referenceCell}

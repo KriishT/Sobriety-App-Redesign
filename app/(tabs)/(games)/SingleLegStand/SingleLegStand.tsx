@@ -1,12 +1,12 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useState, useRef } from 'react';
-import { Gyroscope } from 'expo-sensors';
 import { GameTimer } from '@/components/GameTimer';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { Gyroscope } from 'expo-sensors';
+import { StatusBar } from 'expo-status-bar';
+import { useRef, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SingleLegStand() {
   const [gameStart, setGameStart] = useState(false);
@@ -114,9 +114,7 @@ export default function SingleLegStand() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.iconContainer}>
-              <Ionicons name="body-outline" size={64} color="#EC4899" />
-            </View>
+            <View style={styles.iconContainer} />
 
             <Text style={styles.instructionTitle}>Single Leg Stand Test</Text>
             
@@ -169,9 +167,21 @@ export default function SingleLegStand() {
             {/* Rules */}
             <View style={styles.rulesBox}>
               <Text style={styles.rulesTitle}>Test Rules:</Text>
+
+              <View style={styles.rulesImageContainer}>
+                <Image
+                  source={require('../../../../assets/images/single-leg-stand.png')}
+                  style={styles.rulesImage}
+                  resizeMode="contain"
+                />
+              </View>
               <View style={styles.rule}>
                 <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Put phone in your pocket before starting</Text>
+                <Text style={styles.ruleText}>Stretch out your arm with the smarthwatch</Text>
+              </View>
+              <View style={styles.rule}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.ruleText}> Hold your phone in the other hand and sretch it out as well.</Text>
               </View>
               <View style={styles.rule}>
                 <View style={styles.bulletPoint} />
@@ -215,7 +225,6 @@ export default function SingleLegStand() {
 
             {/* Instructions */}
             <View style={styles.gameInstructionCard}>
-              <Ionicons name="body-outline" size={32} color="#EC4899" />
               <Text style={styles.gameInstruction}>
                 Stand on one leg and hold your balance!
               </Text>
@@ -378,6 +387,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: 30,
+  },
+  rulesImageContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  rulesImage: {
+    width: 140,
+    height: 140,
   },
   instructionTitle: {
     fontSize: 24,

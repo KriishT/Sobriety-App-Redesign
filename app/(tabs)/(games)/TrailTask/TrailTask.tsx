@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -315,19 +315,6 @@ export default function TrailMaking() {
               }}
             >
               <Svg width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={styles.svg}>
-                {/* Draw permanent connected lines */}
-                {connectedLines.map((line, index) => (
-                  <Line
-                    key={`line-${index}`}
-                    x1={line.from.x}
-                    y1={line.from.y}
-                    x2={line.to.x}
-                    y2={line.to.y}
-                    stroke="#EAB308"
-                    strokeWidth={6}
-                  />
-                ))}
-
                 {/* Draw finger trail */}
                 {fingerPath.length > 1 && fingerPath.map((point, index) => {
                   if (index === 0) return null;
