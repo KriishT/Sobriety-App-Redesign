@@ -37,6 +37,7 @@ export default function ChoiceReaction() {
   const missedBlueTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const redDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRespondedToBlueRef = useRef(false);
+  const gameActiveRef = useRef(false);
 
   const BLUE_MAX_MS = 2000; // If user doesn't press blue within this time, count as error and go to next round
   const BLUE_COLOR = '#3B82F6';
@@ -45,6 +46,8 @@ export default function ChoiceReaction() {
   const router = useRouter();
 
   const handleBackToDashboard = () => {
+    gameActiveRef.current = false;
+    
     if (missedBlueTimeoutRef.current) {
       clearTimeout(missedBlueTimeoutRef.current);
       missedBlueTimeoutRef.current = null;
@@ -54,20 +57,21 @@ export default function ChoiceReaction() {
       redDelayTimeoutRef.current = null;
     }
     setSquares([
-    { id: 0, color: '#000000' },
-    { id: 1, color: '#000000' },
-    { id: 2, color: '#000000' },
-    { id: 3, color: '#000000' },
-  ]);
-  setGameCompleted(false);
-  setGameStart(false);
-  setActiveSquare(null);
-  setCurrentPhase('waiting');
-  setIsHolding(false);
-  setPressReactionTimes([]);
-  setReleaseReactionTimes([]);
-  router.replace('/(tabs)/dashboard')
-};
+      { id: 0, color: '#000000' },
+      { id: 1, color: '#000000' },
+      { id: 2, color: '#000000' },
+      { id: 3, color: '#000000' },
+    ]);
+    setGameCompleted(false);
+    setGameStart(false);
+    setActiveSquare(null);
+    setCurrentPhase('waiting');
+    setIsHolding(false);
+    setPressReactionTimes([]);
+    setReleaseReactionTimes([]);
+    setErrors(0);
+    router.replace('/(tabs)/dashboard');
+  };
 
   const resetSquares = () => {
     setSquares([
@@ -79,6 +83,8 @@ export default function ChoiceReaction() {
   };
 
   const startNewRound = () => {
+    if (!gameActiveRef.current) return;
+    
     if (missedBlueTimeoutRef.current) {
       clearTimeout(missedBlueTimeoutRef.current);
       missedBlueTimeoutRef.current = null;
@@ -97,6 +103,8 @@ export default function ChoiceReaction() {
     const delay = Math.random() * 1500 + 500;
     
     setTimeout(() => {
+      if (!gameActiveRef.current) return;
+      
       const randomSquare = Math.floor(Math.random() * 4);
       setActiveSquare(randomSquare);
       setCurrentPhase('blue');
@@ -108,8 +116,9 @@ export default function ChoiceReaction() {
         sq.id === randomSquare ? { ...sq, color: BLUE_COLOR } : sq
       ));
 
-      // If user doesn't press blue within BLUE_MAX_MS, count as error and go to next round (not in avg press reaction)
+      // If user doesn't press blue within BLUE_MAX_MS, count as error and go to next round
       missedBlueTimeoutRef.current = setTimeout(() => {
+        if (!gameActiveRef.current) return;
         missedBlueTimeoutRef.current = null;
         setErrors(prev => prev + 1);
         startNewRound();
@@ -118,6 +127,8 @@ export default function ChoiceReaction() {
   };
 
   const handleSquarePressIn = (id: number) => {
+    if (!gameActiveRef.current) return;
+    
     if (currentPhase === 'blue' && id === activeSquare) {
       if (hasRespondedToBlueRef.current) {
         // Press again after already responding (e.g. pressed then released) – count as error and move on
@@ -142,6 +153,7 @@ export default function ChoiceReaction() {
       // Change to red after 500ms - 1500ms
       const redDelay = Math.random() * 1000 + 500;
       redDelayTimeoutRef.current = setTimeout(() => {
+        if (!gameActiveRef.current) return;
         redDelayTimeoutRef.current = null;
         setCurrentPhase('red');
         redStartTime.current = Date.now();
@@ -155,12 +167,15 @@ export default function ChoiceReaction() {
   };
 
   const handleSquarePressOut = (id: number) => {
+    if (!gameActiveRef.current) return;
+    
     if (currentPhase === 'red' && id === activeSquare && isHolding) {
       // Correct release during red phase
       const reactionTime = Date.now() - redStartTime.current;
       setReleaseReactionTimes(prev => [...prev, reactionTime]);
       
       setTimeout(() => {
+        if (!gameActiveRef.current) return;
         startNewRound();
       }, 500);
     } else if (isHolding && currentPhase === 'blue') {
@@ -172,17 +187,31 @@ export default function ChoiceReaction() {
       setErrors(prev => prev + 1);
       setIsHolding(false);
       setTimeout(() => {
+        if (!gameActiveRef.current) return;
         startNewRound();
       }, 500);
     }
   };
 
   const handleGameOver = () => {
+    gameActiveRef.current = false;
+    
+    // Clear all timeouts
+    if (missedBlueTimeoutRef.current) {
+      clearTimeout(missedBlueTimeoutRef.current);
+      missedBlueTimeoutRef.current = null;
+    }
+    if (redDelayTimeoutRef.current) {
+      clearTimeout(redDelayTimeoutRef.current);
+      redDelayTimeoutRef.current = null;
+    }
+    
     setGameCompleted(true);
     setGameStart(false);
   };
 
   const gameStartState = () => {
+    gameActiveRef.current = true;
     setGameStart(true);
     setGameCompleted(false);
     setPressReactionTimes([]);
