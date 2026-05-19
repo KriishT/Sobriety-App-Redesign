@@ -1,4 +1,5 @@
 ﻿import { Countdown } from "@/components/Countdown";
+import { scale, ms, vs } from '@/lib/scale';
 import { GameTimer } from "@/components/GameTimer";
 import { ScoreTrendCard } from "@/components/ScoreTrendCard";
 import { saveGameResult } from "@/lib/firestore";
@@ -205,7 +206,7 @@ export default function TypingChallenge() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar style="dark" />
 
       {/* Header */}
@@ -367,7 +368,7 @@ export default function TypingChallenge() {
             {/* Typing Efficiency Card */}
             <View style={styles.scoreCard}>
               <Text style={styles.scoreLabel}>Typing Efficiency</Text>
-              <Text style={[styles.scoreValue, { fontSize: 48 }]}>
+              <Text style={[styles.scoreValue, { fontSize: ms(48) }]}>
                 {calculateEfficiency()}%
               </Text>
               <Text
@@ -688,7 +689,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 56,
+    fontSize: ms(56),
     fontWeight: "700",
     color: "#10B981",
     marginBottom: 0,
@@ -801,4 +802,8 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 });
+
+
+
+
 

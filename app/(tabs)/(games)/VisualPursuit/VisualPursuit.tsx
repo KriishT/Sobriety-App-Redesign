@@ -1,4 +1,4 @@
-import { saveGameResult } from "@/lib/firestore";
+﻿import { saveGameResult } from "@/lib/firestore";
 import { EMPATICA_PARTICIPANT } from "@/lib/empaticaConfig";
 import { uploadVideo } from "@/lib/firebaseStorage";
 import * as FileSystem from 'expo-file-system/legacy';
@@ -30,9 +30,9 @@ const PIP_W = 88;
 const PIP_H = 112;
 const HEADER_H = 56; // paddingVertical:16×2 + icon height:24
 
-// Eye-shaped oval — sized to be inclusive for all eye sizes
-const EYE_OVAL_W = 150;
-const EYE_OVAL_H = 90;
+// Oval dimensions — slightly bigger than before to encourage closer eye placement
+const EYE_OVAL_W = 170;   // horizontal axis (wider)
+const EYE_OVAL_H = 108;   // vertical axis (taller)
 
 type RoundKey = "vertical_left" | "vertical_right" | "horizontal_left" | "horizontal_right";
 type BallStage = "to-end" | "to-start";
@@ -416,7 +416,7 @@ export default function VisualPursuit() {
   const isTestPhase = TEST_PHASES.has(phase);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar style="dark" />
 
       {/* ── INTRO ──────────────────────────────────────────────────────────── */}
@@ -885,7 +885,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.25)",
   },
 
-  // Vertical rounds — standard eye oval (slightly wider than tall)
+  // Vertical rounds — landscape oval (wider than tall, matches eye shape)
   eyeOval: {
     width: EYE_OVAL_W,
     height: EYE_OVAL_H,
@@ -896,10 +896,10 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
 
-  // Horizontal rounds — same eye-shaped oval as vertical, position near camera is the differentiator
+  // Horizontal rounds — portrait oval (taller than wide, dimensions swapped vs vertical)
   eyeOvalHorizontal: {
-    width: EYE_OVAL_W,
-    height: EYE_OVAL_H,
+    width: EYE_OVAL_H,
+    height: EYE_OVAL_W,
     borderRadius: 9999,
     borderWidth: 2.5,
     borderColor: "#6366F1",
@@ -1073,3 +1073,5 @@ const styles = StyleSheet.create({
   },
   bannerText: { flex: 1, fontSize: 13, color: "#92400E" },
 });
+
+

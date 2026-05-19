@@ -1,9 +1,11 @@
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { registerUser } from '@/lib/auth';
+import { scale, ms, vs } from '@/lib/scale';
 
 export default function SignUp() {
   const router = useRouter();
@@ -32,10 +34,11 @@ export default function SignUp() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
       <StatusBar style="dark" />
       
       <ScrollView 
@@ -117,18 +120,19 @@ export default function SignUp() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
   scrollContent: { flexGrow: 1 },
-  content: { flex: 1, padding: 20, justifyContent: 'center' },
-  iconContainer: { alignItems: 'center', marginBottom: 20 },
-  icon: { width: 70, height: 70, borderRadius: 16, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 40 },
+  content: { flexGrow: 1, padding: scale(20), justifyContent: 'center', minHeight: '100%' },
+  iconContainer: { alignItems: 'center', marginBottom: vs(20) },
+  icon: { width: scale(70), height: scale(70), borderRadius: scale(16), backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: ms(28), fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: vs(8) },
+  subtitle: { fontSize: ms(14), color: '#6B7280', textAlign: 'center', marginBottom: vs(40) },
   inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' },
   inputIcon: { marginRight: 12 },
   input: { flex: 1, fontSize: 16, color: '#1F2937', paddingVertical: 12 },

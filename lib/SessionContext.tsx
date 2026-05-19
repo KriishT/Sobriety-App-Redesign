@@ -125,6 +125,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setSessionStartTime(now);
     sessionStartTimeRef.current = now;
     setSessionId(id);
+    setPartialSessionId(null);  // ensure dismissed/stale partial IDs never carry over
+    pendingJobsRef.current = [];
   };
 
   const completeGame = (gameType: string, metrics: any, startTime?: Date) => {

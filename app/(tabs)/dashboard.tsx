@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+﻿import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useSession, GAME_ROUTES, GAME_NAMES } from '@/lib/SessionContext';
 import { fetchLatestPartialSession, abandonPartialSession, PartialSessionDoc } from '@/lib/firestore';
 import { useParticipant } from '@/lib/ParticipantContext';
+import { scale, ms, vs } from '@/lib/scale';
 
 const games = [
   { id: 1, name: 'Visual Pursuit', category: 'OCULUR ASSESSMENT', time: '2-5 min', icon: 'eye-outline', color: '#3B82F6', route: '/(tabs)/(games)/VisualPursuit/VisualPursuit' },
@@ -54,7 +55,7 @@ export default function Dashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
       <View style={styles.header}>
@@ -195,7 +196,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: ms(24),
     fontWeight: '700',
     color: '#1F2937',
   },
@@ -254,15 +255,15 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   iconContainer: {
-    width: 56,
-    height: 56,
+    width: scale(56),
+    height: scale(56),
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   gameName: {
-    fontSize: 16,
+    fontSize: ms(16),
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 4,
@@ -294,8 +295,8 @@ const styles = StyleSheet.create({
     borderColor: '#F59E0B',
   },
   resumeIconWrap: {
-    width: 52,
-    height: 52,
+    width: scale(52),
+    height: scale(52),
     borderRadius: 26,
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
@@ -376,8 +377,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fullSessionIconWrap: {
-    width: 96,
-    height: 96,
+    width: scale(96),
+    height: scale(96),
     borderRadius: 48,
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
@@ -385,7 +386,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fullSessionTitle: {
-    fontSize: 22,
+    fontSize: ms(22),
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 8,
@@ -434,3 +435,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+

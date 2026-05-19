@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, ms, vs } from '@/lib/scale';
 import Svg, { Circle, Line } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -152,8 +153,8 @@ function recognizeSymbol(strokes: number[][]): number {
     }
   });
 
-  // Must draw all canonical edges (recall >= 0.9) AND not add excessive extras (jaccard < 0.25)
-  return bestScore < 0.25 && bestRecall >= 0.9 ? bestSym : -1;
+  // Must draw nearly all canonical edges (recall >= 0.95) AND not add excessive extras (jaccard < 0.18)
+  return bestScore < 0.18 && bestRecall >= 0.95 ? bestSym : -1;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -418,7 +419,7 @@ export default function DSST() {
   // ─────────────────────────────────────────────────────────────────────────
   if (phase === 'intro') {
     return (
-      <SafeAreaView style={s.container} edges={['top']}>
+      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <StatusBar style="dark" />
         <View style={s.header}>
           <TouchableOpacity onPress={handleBackToDashboard} style={s.backBtn}>
@@ -483,7 +484,7 @@ export default function DSST() {
     const acc = totalAttempts > 0 ? Math.round((score / totalAttempts) * 100) : 0;
     const passed = score >= 20;
     return (
-      <SafeAreaView style={s.container} edges={['top']}>
+      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <StatusBar style="dark" />
         <View style={s.header}>
           <TouchableOpacity onPress={handleBackToDashboard} style={s.backBtn}>
@@ -557,7 +558,7 @@ export default function DSST() {
   const activeDots = new Set(currentStrokeRef.current);
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
       {/* ── Header ── */}
@@ -827,4 +828,6 @@ const s = StyleSheet.create({
   statLabel:  { fontSize: 11, color: '#6B7280', marginBottom: 4 },
   statValue:  { fontSize: 20, fontWeight: '700', color: '#1F2937' },
 });
+
+
 

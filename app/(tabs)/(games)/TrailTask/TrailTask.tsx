@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, ms, vs } from '@/lib/scale';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -205,7 +206,7 @@ export default function TrailMaking() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
       {/* INSTRUCTIONS SCREEN */}
@@ -515,9 +516,9 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: scale(120),
+    height: scale(120),
+    borderRadius: scale(60),
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
@@ -525,7 +526,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   instructionTitle: {
-    fontSize: 24,
+    fontSize: ms(24),
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
@@ -734,7 +735,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   resultTitle: {
-    fontSize: 24,
+    fontSize: ms(24),
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 8,
@@ -761,7 +762,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 56,
+    fontSize: ms(56),
     fontWeight: '700',
     color: '#F59E0B',
   },
@@ -821,3 +822,6 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
   },
 });
+
+
+

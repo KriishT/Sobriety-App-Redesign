@@ -3,6 +3,7 @@ import { saveSession } from '@/lib/saveSession';
 import { EMPATICA_PARTICIPANT } from '@/lib/empaticaConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { scale, ms, vs } from '@/lib/scale';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -87,7 +88,7 @@ export default function SessionResults() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Session Complete</Text>
       </View>
@@ -189,9 +190,9 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20, paddingBottom: 40 },
   heroSection: { alignItems: 'center', marginBottom: 32 },
   heroBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: scale(96),
+    height: scale(96),
+    borderRadius: scale(48),
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -249,4 +250,6 @@ const styles = StyleSheet.create({
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
 });
+
+
 

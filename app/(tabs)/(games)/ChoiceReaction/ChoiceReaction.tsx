@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, ms, vs } from '@/lib/scale';
 
 type Square = { id: number; color: string };
 type Phase = 'intro' | 'game' | 'results';
@@ -43,6 +44,7 @@ export default function ChoiceReaction() {
   const gameStartTimeRef = useRef<number>(0);
   const missedBlueTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const redDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nextRoundTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRespondedToBlueRef = useRef(false);
   const gameActiveRef = useRef(false);
   const pressReactionTimesRef = useRef<number[]>([]);
@@ -57,6 +59,7 @@ export default function ChoiceReaction() {
   const clearTimeouts = () => {
     if (missedBlueTimeoutRef.current) { clearTimeout(missedBlueTimeoutRef.current); missedBlueTimeoutRef.current = null; }
     if (redDelayTimeoutRef.current)   { clearTimeout(redDelayTimeoutRef.current);   redDelayTimeoutRef.current   = null; }
+    if (nextRoundTimeoutRef.current)  { clearTimeout(nextRoundTimeoutRef.current);  nextRoundTimeoutRef.current  = null; }
   };
 
   const resetSquares = () => setSquares([...BLACK_SQUARES]);
@@ -123,12 +126,19 @@ export default function ChoiceReaction() {
     if (currentPhase === 'red' && id === activeSquare && isHolding) {
       const rt = Date.now() - redStartTime.current;
       setReleaseReactionTimes(prev => { const n = [...prev, rt]; releaseReactionTimesRef.current = n; return n; });
-      setTimeout(() => { if (gameActiveRef.current) startNewRound(); }, 500);
+      clearTimeouts();
+      nextRoundTimeoutRef.current = setTimeout(() => {
+        nextRoundTimeoutRef.current = null;
+        if (gameActiveRef.current) startNewRound();
+      }, 500);
     } else if (isHolding && currentPhase === 'blue') {
       clearTimeouts();
       setErrors(prev => prev + 1);
       setIsHolding(false);
-      setTimeout(() => { if (gameActiveRef.current) startNewRound(); }, 500);
+      nextRoundTimeoutRef.current = setTimeout(() => {
+        nextRoundTimeoutRef.current = null;
+        if (gameActiveRef.current) startNewRound();
+      }, 500);
     }
   };
 
@@ -201,7 +211,7 @@ export default function ChoiceReaction() {
   const isPassing = avgPressTime < 800 && avgReleaseTime < 800 && errors < 5;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
       {/* ── INTRO ── */}
@@ -435,8 +445,8 @@ const styles = StyleSheet.create({
   headerTitle:      { fontSize: 18, fontWeight: '700', color: '#1F2937' },
   placeholder:      { width: 32 },
   scrollContent:    { padding: 20, paddingBottom: 40 },
-  iconContainer:    { width: 120, height: 120, borderRadius: 60, backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 30 },
-  instructionTitle: { fontSize: 24, fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 16 },
+  iconContainer:    { width: scale(120), height: scale(120), borderRadius: scale(60), backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 30 },
+  instructionTitle: { fontSize: ms(24), fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 16 },
   instructionText:  { fontSize: 16, color: '#6B7280', textAlign: 'center', lineHeight: 24, marginBottom: 30, paddingHorizontal: 20 },
 
   // Example box
@@ -464,17 +474,17 @@ const styles = StyleSheet.create({
   timePrompt:        { fontSize: 14, fontWeight: '600', color: '#6B7280', textAlign: 'center', marginBottom: 40, paddingHorizontal: 20 },
   gameGridContainer: { alignItems: 'center' },
   gameGridRow:       { flexDirection: 'row', justifyContent: 'center', gap: 30, marginBottom: 30 },
-  gameSquare:        { width: 120, height: 120, borderRadius: 16, borderWidth: 3, borderColor: '#E5E7EB' },
+  gameSquare:        { width: scale(120), height: 120, borderRadius: 16, borderWidth: 3, borderColor: '#E5E7EB' },
   stopButton:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EF4444', paddingVertical: 16, borderRadius: 12, marginTop: 32, gap: 8 },
   stopButtonText:    { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
 
   // Results
   resultScreen:    { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  resultTitle:     { fontSize: 24, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
+  resultTitle:     { fontSize: ms(24), fontWeight: '700', color: '#1F2937', marginBottom: 8 },
   resultSubtitle:  { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 30 },
   scoreCard:       { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20, width: '100%' },
   scoreLabel:      { fontSize: 14, color: '#6B7280', marginBottom: 8 },
-  scoreValue:      { fontSize: 56, fontWeight: '700', color: '#10B981' },
+  scoreValue:      { fontSize: ms(56), fontWeight: '700', color: '#10B981' },
   scoreSubtext:    { fontSize: 14, color: '#9CA3AF', marginBottom: 20 },
   statsRow:        { flexDirection: 'row', alignItems: 'center', paddingTop: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB', width: '100%' },
   statItem:        { flex: 1, alignItems: 'center' },
@@ -486,4 +496,7 @@ const styles = StyleSheet.create({
   homeButton:      { paddingVertical: 12 },
   homeButtonText:  { fontSize: 16, fontWeight: '600', color: '#10B981' },
 });
+
+
+
 

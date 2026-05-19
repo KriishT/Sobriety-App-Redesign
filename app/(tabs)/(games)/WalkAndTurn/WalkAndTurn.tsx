@@ -1,4 +1,5 @@
 ﻿import { Countdown } from "@/components/Countdown";
+import { scale, ms, vs } from '@/lib/scale';
 import { ScoreTrendCard } from "@/components/ScoreTrendCard";
 import { EmpaticaWalkTurnResult, fetchWalkTurnResults } from "@/lib/empaticaS3";
 import { saveGameResult } from "@/lib/firestore";
@@ -21,7 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TestPhase = "pocket" | "walk-forward" | "turn" | "walk-back" | "finished";
+type TestPhase = "walk-forward" | "turn" | "walk-back" | "finished";
 
 export default function WalkAndTurn() {
   const [countdown, setCountdown] = useState(false);
@@ -29,7 +30,7 @@ export default function WalkAndTurn() {
   const [gameCompleted, setGameCompleted] = useState(false);
   const [empaticaResult, setEmpaticaResult] = useState<EmpaticaWalkTurnResult | null>(null);
   const [fetchingWatch, setFetchingWatch] = useState(false);
-  const [testPhase, setTestPhase] = useState<TestPhase>("pocket");
+  const [testPhase, setTestPhase] = useState<TestPhase>("walk-forward");
 
   // Gyroscope data
   const [forwardGyroSum, setForwardGyroSum] = useState(0);
@@ -38,7 +39,6 @@ export default function WalkAndTurn() {
   const [backSamples, setBackSamples] = useState(0);
 
   const gyroSubscription = useRef<any>(null);
-  const phaseTimeoutRef = useRef<any>(null);
   const gameStartTimeRef = useRef<Date | null>(null);
   const forwardGyroSumRef = useRef(0);
   const backGyroSumRef = useRef(0);
@@ -60,10 +60,6 @@ export default function WalkAndTurn() {
       Gyroscope.removeAllListeners();
       gyroSubscription.current = null;
     }
-    if (phaseTimeoutRef.current) {
-      clearTimeout(phaseTimeoutRef.current);
-      phaseTimeoutRef.current = null;
-    }
     Speech.stop();
   };
 
@@ -72,7 +68,7 @@ export default function WalkAndTurn() {
     cleanupAll();
     setGameStart(false);
     setGameCompleted(false);
-    setTestPhase("pocket");
+    setTestPhase("walk-forward");
     setForwardGyroSum(0);
     setBackGyroSum(0);
     setForwardSamples(0);
@@ -117,7 +113,7 @@ export default function WalkAndTurn() {
     setGameCompleted(false);
     setEmpaticaResult(null);
     gameStartTimeRef.current = new Date();
-    setTestPhase("pocket");
+    setTestPhase("walk-forward");
     setForwardGyroSum(0);
     setBackGyroSum(0);
     setForwardSamples(0);
@@ -126,49 +122,31 @@ export default function WalkAndTurn() {
     backGyroSumRef.current = 0;
     forwardSamplesRef.current = 0;
     backSamplesRef.current = 0;
+    speakInstruction("Walk straight for 5 steps, then tap Done");
+    startGyroscope(true);
+  };
 
-    // Phase 1: Place phone in pocket (5 seconds)
-    speakInstruction("Place the phone in your back pocket");
-
-    phaseTimeoutRef.current = setTimeout(() => {
-      // Phase 2: Walk forward (6 seconds)
-      setTestPhase("walk-forward");
-      speakInstruction("Walk straight for 5 steps");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      startGyroscope(true); // Start tracking forward walk
-
-      phaseTimeoutRef.current = setTimeout(() => {
+  // User presses Done to advance through each phase manually.
+  const handleNextPhase = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    switch (testPhase) {
+      case "walk-forward":
         stopGyroscope();
-
-        // Phase 3: Turn around (2 seconds, no gyro tracking)
         setTestPhase("turn");
-        speakInstruction("Turn around");
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        phaseTimeoutRef.current = setTimeout(() => {
-          // Phase 4: Walk back (6 seconds)
-          setTestPhase("walk-back");
-          speakInstruction("Walk 5 steps back to the starting position");
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-          startGyroscope(false); // Start tracking backward walk
-
-          phaseTimeoutRef.current = setTimeout(() => {
-            stopGyroscope();
-
-            // Phase 5: Finished
-            setTestPhase("finished");
-            speakInstruction("Task finished");
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-            phaseTimeoutRef.current = setTimeout(() => {
-              handleGameOver();
-            }, 2000);
-          }, 6000); // 6 seconds walk back
-        }, 2000); // 2 seconds turn
-      }, 6000); // 6 seconds walk forward
-    }, 5000); // 5 seconds pocket placement
+        speakInstruction("Turn around, then tap Done");
+        break;
+      case "turn":
+        setTestPhase("walk-back");
+        speakInstruction("Walk 5 steps back to start, then tap Done");
+        startGyroscope(false);
+        break;
+      case "walk-back":
+        stopGyroscope();
+        setTestPhase("finished");
+        speakInstruction("Task finished");
+        setTimeout(() => handleGameOver(), 1500);
+        break;
+    }
   };
 
   const handleGameOver = () => {
@@ -236,42 +214,35 @@ export default function WalkAndTurn() {
 
   const getPhaseIcon = () => {
     switch (testPhase) {
-      case "pocket":
-        return "phone-portrait-outline";
-      case "walk-forward":
-        return "arrow-up-outline";
-      case "turn":
-        return "sync-outline";
-      case "walk-back":
-        return "arrow-down-outline";
-      case "finished":
-        return "checkmark-circle-outline";
-      default:
-        return "phone-portrait-outline";
+      case "walk-forward": return "arrow-up-outline";
+      case "turn":         return "sync-outline";
+      case "walk-back":    return "arrow-down-outline";
+      case "finished":     return "checkmark-circle-outline";
+    }
+  };
+
+  const getPhaseStep = () => {
+    switch (testPhase) {
+      case "walk-forward": return "Step 1 of 3";
+      case "turn":         return "Step 2 of 3";
+      case "walk-back":    return "Step 3 of 3";
+      case "finished":     return "Done";
     }
   };
 
   const getPhaseText = () => {
     switch (testPhase) {
-      case "pocket":
-        return "Place phone in your back pocket";
-      case "walk-forward":
-        return "Walk straight for 5 steps";
-      case "turn":
-        return "Turn around";
-      case "walk-back":
-        return "Walk 5 steps back";
-      case "finished":
-        return "Task finished!";
-      default:
-        return "";
+      case "walk-forward": return "Walk straight for 5 steps";
+      case "turn":         return "Turn around";
+      case "walk-back":    return "Walk 5 steps back to start";
+      case "finished":     return "Task complete!";
     }
   };
 
   const stabilityScore = calculateStabilityScore();
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar style="dark" />
       {countdown && (
         <Countdown onComplete={() => { setCountdown(false); gameStartState(); }} />
@@ -311,45 +282,24 @@ export default function WalkAndTurn() {
               <Text style={styles.exampleLabel}>Test Steps:</Text>
 
               <View style={styles.stepContainer}>
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>1</Text>
+                {[
+                  "Walk straight for 5 steps, then tap Done",
+                  "Turn around, then tap Done",
+                  "Walk 5 steps back to start, then tap Done",
+                ].map((text, i) => (
+                  <View key={i} style={styles.step}>
+                    <View style={styles.stepNumber}>
+                      <Text style={styles.stepNumberText}>{i + 1}</Text>
+                    </View>
+                    <Text style={styles.stepText}>{text}</Text>
                   </View>
-                  <Text style={styles.stepText}>
-                    Place phone in your back pocket (5 seconds)
-                  </Text>
-                </View>
-
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>2</Text>
-                  </View>
-                  <Text style={styles.stepText}>
-                    Walk straight for 5 steps (6 seconds)
-                  </Text>
-                </View>
-
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>3</Text>
-                  </View>
-                  <Text style={styles.stepText}>Turn around (2 seconds)</Text>
-                </View>
-
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>4</Text>
-                  </View>
-                  <Text style={styles.stepText}>
-                    Walk back 5 steps (6 seconds)
-                  </Text>
-                </View>
+                ))}
               </View>
 
               <View style={styles.exampleNote}>
                 <Ionicons name="information-circle" size={20} color="#3B82F6" />
                 <Text style={styles.exampleNoteText}>
-                  Total duration: ~21 seconds
+                  Hold the phone in your hand throughout
                 </Text>
               </View>
             </View>
@@ -357,28 +307,17 @@ export default function WalkAndTurn() {
             {/* Rules */}
             <View style={styles.rulesBox}>
               <Text style={styles.rulesTitle}>Important:</Text>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>
-                  Listen carefully to audio instructions
-                </Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>
-                  Keep phone in pocket during the test
-                </Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Walk in a straight line</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>
-                  Maintain steady balance throughout
-                </Text>
-              </View>
+              {[
+                "Hold the phone in your hand — do not put it in your pocket",
+                "Listen to audio cues for each step",
+                "Walk in a straight line",
+                "Tap Done after completing each step",
+              ].map((rule, i) => (
+                <View key={i} style={styles.rule}>
+                  <View style={styles.bulletPoint} />
+                  <Text style={styles.ruleText}>{rule}</Text>
+                </View>
+              ))}
             </View>
 
             <TouchableOpacity
@@ -396,10 +335,7 @@ export default function WalkAndTurn() {
       {gameStart && !gameCompleted && (
         <>
           <View style={styles.header}>
-            <TouchableOpacity
-              onPress={handleBackToDashboard}
-              style={styles.backButton}
-            >
+            <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color="#1F2937" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Walk and Turn</Text>
@@ -408,14 +344,16 @@ export default function WalkAndTurn() {
 
           <View style={styles.gameScreen}>
             <View style={styles.phaseContainer}>
-              <View
-                style={[
-                  styles.phaseIconContainer,
-                  testPhase === "finished" && styles.phaseIconContainerSuccess,
-                ]}
-              >
+              {/* Step badge */}
+              <Text style={styles.stepBadge}>{getPhaseStep()}</Text>
+
+              {/* Phase icon */}
+              <View style={[
+                styles.phaseIconContainer,
+                testPhase === "finished" && styles.phaseIconContainerSuccess,
+              ]}>
                 <Ionicons
-                  name={getPhaseIcon()}
+                  name={getPhaseIcon() as any}
                   size={80}
                   color={testPhase === "finished" ? "#10B981" : "#3B82F6"}
                 />
@@ -423,56 +361,31 @@ export default function WalkAndTurn() {
 
               <Text style={styles.phaseTitle}>{getPhaseText()}</Text>
 
-              {/* Phase indicator */}
+              {/* 3-dot progress indicator */}
               <View style={styles.phaseIndicator}>
-                <View
-                  style={[
-                    styles.phaseDot,
-                    testPhase !== "pocket" && styles.phaseDotActive,
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.phaseDot,
-                    testPhase === "walk-forward" ||
-                    testPhase === "turn" ||
-                    testPhase === "walk-back" ||
-                    testPhase === "finished"
-                      ? styles.phaseDotActive
-                      : {},
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.phaseDot,
-                    testPhase === "turn" ||
-                    testPhase === "walk-back" ||
-                    testPhase === "finished"
-                      ? styles.phaseDotActive
-                      : {},
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.phaseDot,
-                    testPhase === "walk-back" || testPhase === "finished"
-                      ? styles.phaseDotActive
-                      : {},
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.phaseDot,
-                    testPhase === "finished" && styles.phaseDotActive,
-                  ]}
-                />
+                {(["walk-forward", "turn", "walk-back"] as const).map((p) => {
+                  const phaseOrder = ["walk-forward", "turn", "walk-back", "finished"];
+                  const active = phaseOrder.indexOf(testPhase) >= phaseOrder.indexOf(p);
+                  return (
+                    <View key={p} style={[styles.phaseDot, active && styles.phaseDotActive]} />
+                  );
+                })}
               </View>
 
+              {/* Audio hint */}
               <View style={styles.audioIndicator}>
-                <Ionicons name="volume-high" size={24} color="#3B82F6" />
-                <Text style={styles.audioText}>Listen to instructions</Text>
+                <Ionicons name="volume-high" size={20} color="#3B82F6" />
+                <Text style={styles.audioText}>Listen for audio cues</Text>
               </View>
             </View>
+
+            {/* Done button — hidden on finished phase (auto-completes) */}
+            {testPhase !== "finished" && (
+              <TouchableOpacity style={styles.doneButton} onPress={handleNextPhase}>
+                <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
+                <Text style={styles.doneButtonText}>Done — Next Step</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
@@ -798,12 +711,12 @@ const styles = StyleSheet.create({
   // GAME SCREEN
   gameScreen: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 40,
   },
   phaseContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 32,
   },
   phaseIconContainer: {
     width: 160,
@@ -853,6 +766,33 @@ const styles = StyleSheet.create({
     color: "#1E40AF",
     marginLeft: 8,
   },
+  stepBadge: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#3B82F6",
+    backgroundColor: "#DBEAFE",
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 24,
+    overflow: "hidden",
+  },
+  doneButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#3B82F6",
+    paddingVertical: 18,
+    borderRadius: 14,
+    marginHorizontal: 24,
+    marginBottom: 20,
+    gap: 10,
+  },
+  doneButtonText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
 
   // RESULT SCREEN
   resultScreen: {
@@ -889,7 +829,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 56,
+    fontSize: ms(56),
     fontWeight: "700",
     color: "#3B82F6",
   },
@@ -949,4 +889,8 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
   },
 });
+
+
+
+
 

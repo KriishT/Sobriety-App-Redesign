@@ -1,9 +1,11 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { loginUser } from '@/lib/auth';
+import { scale, ms, vs } from '@/lib/scale';
 
 export default function SignIn() {
   const router = useRouter();
@@ -28,13 +30,13 @@ export default function SignIn() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
-      
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.iconContainer}>
           <View style={styles.icon}>
             <Ionicons name="shield-checkmark-outline" size={32} color="#4F46E5" />
@@ -133,17 +135,18 @@ export default function SignIn() {
             Don't have an account? <Text style={styles.linkTextBold}>Sign up</Text>
           </Text>
         </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
-  content: { flex: 1, padding: 20, justifyContent: 'center' },
-  iconContainer: { alignItems: 'center', marginBottom: 20 },
-  icon: { width: 70, height: 70, borderRadius: 16, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 28, fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 30 },
+  content: { flexGrow: 1, padding: scale(20), justifyContent: 'center', minHeight: '100%' },
+  iconContainer: { alignItems: 'center', marginBottom: vs(20) },
+  icon: { width: scale(70), height: scale(70), borderRadius: scale(16), backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: ms(28), fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: vs(30) },
   tabContainer: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 10, padding: 4, marginBottom: 30 },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   activeTab: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },

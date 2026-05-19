@@ -1,4 +1,5 @@
 ﻿import { Countdown } from "@/components/Countdown";
+import { scale, ms, vs } from '@/lib/scale';
 import { ScoreTrendCard } from "@/components/ScoreTrendCard";
 import { saveGameResult } from "@/lib/firestore";
 import { EMPATICA_PARTICIPANT } from "@/lib/empaticaConfig";
@@ -118,7 +119,7 @@ export default function StroopNaming() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <StatusBar style="dark" />
 
       {/* Header */}
@@ -470,7 +471,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 48,
+    fontSize: ms(48),
     fontWeight: "700",
     color: "#4F46E5",
     marginBottom: 4,
@@ -543,4 +544,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
+
+
+
+
 

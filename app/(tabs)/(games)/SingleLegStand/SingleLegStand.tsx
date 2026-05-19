@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, ms, vs } from '@/lib/scale';
 
 export default function SingleLegStand() {
   const [countdown, setCountdown] = useState(false);
@@ -144,7 +145,7 @@ export default function SingleLegStand() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       {countdown && (
         <Countdown onComplete={() => { setCountdown(false); gameStartState(); }} />
@@ -457,9 +458,9 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: scale(120),
+    height: scale(120),
+    borderRadius: scale(60),
     backgroundColor: '#FCE7F3',
     alignItems: 'center',
     justifyContent: 'center',
@@ -475,7 +476,7 @@ const styles = StyleSheet.create({
     height: 140,
   },
   instructionTitle: {
-    fontSize: 24,
+    fontSize: ms(24),
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
@@ -688,7 +689,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   resultTitle: {
-    fontSize: 24,
+    fontSize: ms(24),
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 8,
@@ -715,7 +716,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 56,
+    fontSize: ms(56),
     fontWeight: '700',
     color: '#EC4899',
   },
@@ -797,3 +798,6 @@ const styles = StyleSheet.create({
     color: '#EC4899',
   },
 });
+
+
+

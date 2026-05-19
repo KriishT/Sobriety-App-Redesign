@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, BackHandler, View } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
 import { onAuthChanged } from '@/lib/auth';
 import { SessionProvider } from '@/lib/SessionContext';
 import { ParticipantProvider, useParticipant } from '@/lib/ParticipantContext';
@@ -16,6 +17,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const unsub = onAuthChanged((u) => setUser(u));
     return unsub;
   }, []);
+
+  // Intercept the Android hardware back button inside game screens so it always
+  // returns to the dashboard instead of going back through the navigation history
+  // (which could land on a previously-visited game).
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const path = segments.join('/');
+      if (path.includes('(games)')) {
+        router.replace('/(tabs)/dashboard');
+        return true; // consumed — prevent OS default back
+      }
+      return false; // let OS handle it for non-game screens
+    });
+    return () => sub.remove();
+  }, [segments, router]);
 
   useEffect(() => {
     if (user === undefined || configLoading) return;
@@ -50,6 +66,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  // Hide the Android system navigation bar (back/home/recents buttons) app-wide.
+  // The gesture navigation area is still functional; it just doesn't render visible buttons.
+  useEffect(() => {
+    NavigationBar.setVisibilityAsync('hidden');
+    NavigationBar.setBehaviorAsync('overlay-swipe'); // swipe from edge to reveal temporarily
+  }, []);
+
   return (
     <ParticipantProvider>
       <SessionProvider>

@@ -1,5 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
+﻿import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { scale, ms, vs } from '@/lib/scale';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -44,7 +45,7 @@ export default function Setup() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -147,8 +148,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
   content: { padding: 24, paddingBottom: 40 },
   iconWrap: {
-    width: 100,
-    height: 100,
+    width: scale(100),
+    height: scale(100),
     borderRadius: 50,
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 16,
   },
-  title: { fontSize: 26, fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 8 },
+  title: { fontSize: ms(26), fontWeight: '700', color: '#1F2937', textAlign: 'center', marginBottom: 8 },
   subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 21, marginBottom: 24 },
 
   guideCard: {
@@ -220,3 +221,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 });
+
+

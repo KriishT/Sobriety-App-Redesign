@@ -1,9 +1,10 @@
-import { logoutUser, onAuthChanged } from '@/lib/auth';
+﻿import { logoutUser, onAuthChanged } from '@/lib/auth';
 import { setActiveParticipant } from '@/lib/empaticaConfig';
 import { useParticipant } from '@/lib/ParticipantContext';
 import { parseParticipantConfig, saveParticipantConfig } from '@/lib/participantConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { scale, ms, vs } from '@/lib/scale';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
@@ -70,7 +71,7 @@ export default function Profile() {
   const parsedPreview = fullId && serial ? parseParticipantConfig(fullId, serial) : null;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -207,8 +208,8 @@ const styles = StyleSheet.create({
   },
   avatarContainer: { marginBottom: 14 },
   avatar: {
-    width: 80,
-    height: 80,
+    width: scale(80),
+    height: scale(80),
     borderRadius: 20,
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
@@ -300,3 +301,5 @@ const styles = StyleSheet.create({
   },
   signOutText: { fontSize: 16, fontWeight: '600', color: '#EF4444' },
 });
+
+

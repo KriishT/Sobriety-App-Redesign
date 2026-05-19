@@ -1,5 +1,5 @@
-import { SessionLineChart } from '@/components/SessionLineChart';
-import { fetchSessionGameHistory, HistoricalRecord } from '@/lib/firestore';
+﻿import { SessionLineChart } from '@/components/SessionLineChart';
+import { fetchSessionGameHistory, fetchAllSessions, HistoricalRecord, SessionSummary } from '@/lib/firestore';
 import { EMPATICA_PARTICIPANT } from '@/lib/empaticaConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -132,34 +132,117 @@ function fmtVal(v: number | null) {
   return v < 0.1 ? v.toFixed(3) : v.toFixed(1);
 }
 
+const GAME_KEY_METRICS: Record<string, string[]> = {
+  visual_pursuit:   ['apiSuccess'],
+  dsst:             ['score', 'accuracy', 'totalAttempts'],
+  tongue_twister:   ['phrasesCompleted', 'avgJitter', 'avgSpeakingRate'],
+  choice_reaction:  ['avgPressReactionTimeMs', 'errors', 'totalRounds'],
+  stroop_naming:    ['score', 'accuracy', 'totalAttempts'],
+  trail_task:       ['completionTimeSeconds', 'passed', 'circlesCompleted'],
+  typing_game:      ['wpm', 'accuracy', 'efficiency'],
+  single_leg_stand: ['stabilityScore', 'sampleCount'],
+  walk_and_turn:    ['stabilityScore', 'totalSamples', 'forwardGyroAvg'],
+};
+
+function formatMetricKey(key: string) {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+}
+function formatMetricValue(value: any): string {
+  if (value === null || value === undefined) return 'n/a';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return String(value);
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Statistics() {
   const [selectedGame, setSelectedGame] = useState<GameCfg | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<'graphs' | 'sessions'>('graphs');
   const [history, setHistory] = useState<Record<string, HistoricalRecord[]>>({});
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const participantId = EMPATICA_PARTICIPANT.fullId;
-    Promise.all(
-      GAMES.map(g =>
+    Promise.all([
+      ...GAMES.map(g =>
         fetchSessionGameHistory(g.key, participantId)
           .then(records => ({ key: g.key, records }))
-      )
-    ).then(results => {
+      ),
+      fetchAllSessions(participantId).then(s => ({ key: '__sessions__', sessions: s })),
+    ]).then(results => {
       const map: Record<string, HistoricalRecord[]> = {};
-      results.forEach(r => { map[r.key] = r.records; });
+      results.forEach(r => {
+        if ('records' in r) map[r.key] = r.records;
+        else setSessions((r as any).sessions);
+      });
       setHistory(map);
       setLoading(false);
     });
   }, []);
+
+  // ── Session detail view ──────────────────────────────────────────────────
+
+  if (selectedSession) {
+    const date = new Date(selectedSession.startTime);
+    const dateStr = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const queue = selectedSession.gameQueue.length > 0 ? selectedSession.gameQueue : Object.keys(selectedSession.games);
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <StatusBar style="dark" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setSelectedSession(null)} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Session Results</Text>
+            <Text style={styles.headerSub}>{dateStr} · {timeStr}</Text>
+          </View>
+          <View style={{ width: 32 }} />
+        </View>
+        <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
+          {queue.map(gameKey => {
+            const gameCfg = GAMES.find(g => g.key === gameKey);
+            const metrics = selectedSession.games[gameKey] ?? {};
+            if (metrics.played === false) return null;
+            const metricKeys = GAME_KEY_METRICS[gameKey] ?? [];
+            return (
+              <View key={gameKey} style={styles.sessionGameCard}>
+                <View style={styles.sessionGameHeader}>
+                  <Ionicons
+                    name={(gameCfg?.icon ?? 'game-controller-outline') as any}
+                    size={18}
+                    color={gameCfg?.color ?? '#6366F1'}
+                  />
+                  <Text style={[styles.sessionGameName, { color: gameCfg?.color ?? '#6366F1' }]}>
+                    {gameCfg?.name ?? gameKey}
+                  </Text>
+                </View>
+                <View style={styles.sessionMetricsRow}>
+                  {metricKeys.map(mk => (
+                    <View key={mk} style={styles.sessionMetricItem}>
+                      <Text style={styles.sessionMetricLabel}>{formatMetricKey(mk)}</Text>
+                      <Text style={styles.sessionMetricValue}>{formatMetricValue(metrics[mk])}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   // ── Detail view (game selected) ──────────────────────────────────────────
 
   if (selectedGame) {
     const records = history[selectedGame.key] ?? [];
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setSelectedGame(null)} style={styles.backBtn}>
@@ -196,16 +279,32 @@ export default function Statistics() {
     );
   }
 
-  // ── Card grid view ────────────────────────────────────────────────────────
+  // ── Card grid / sessions list view ──────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Statistics</Text>
-          <Text style={styles.headerSub}>Full session trends</Text>
+          <Text style={styles.headerSub}>Full session data</Text>
         </View>
+      </View>
+
+      {/* Tab toggle */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'graphs' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('graphs')}
+        >
+          <Text style={[styles.tabBtnText, activeTab === 'graphs' && styles.tabBtnTextActive]}>Graphs</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'sessions' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('sessions')}
+        >
+          <Text style={[styles.tabBtnText, activeTab === 'sessions' && styles.tabBtnTextActive]}>Sessions</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -213,6 +312,39 @@ export default function Statistics() {
           <ActivityIndicator size="large" color="#6366F1" />
           <Text style={styles.loadingText}>Loading session data...</Text>
         </View>
+      ) : activeTab === 'sessions' ? (
+        <ScrollView contentContainerStyle={styles.gridContent} showsVerticalScrollIndicator={false}>
+          {sessions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No sessions yet</Text>
+              <Text style={styles.emptyBody}>Complete a full session to see it here.</Text>
+            </View>
+          ) : (
+            sessions.map((s, idx) => {
+              const date = new Date(s.startTime);
+              const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+              const timeStr = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+              const gamesPlayed = Object.values(s.games).filter(g => g?.played !== false).length;
+              return (
+                <TouchableOpacity key={s.id} style={styles.gameCard} onPress={() => setSelectedSession(s)} activeOpacity={0.75}>
+                  <View style={[styles.gameIconWrap, { backgroundColor: '#EEF2FF' }]}>
+                    <Ionicons name="clipboard-outline" size={22} color="#6366F1" />
+                  </View>
+                  <View style={styles.gameCardBody}>
+                    <Text style={styles.gameName}>Session {sessions.length - idx}</Text>
+                    <Text style={styles.gameCategory}>{dateStr} · {timeStr}</Text>
+                  </View>
+                  <View style={styles.gameCardRight}>
+                    <Text style={styles.gameValue}>{gamesPlayed}</Text>
+                    <Text style={styles.gameSessionCount}>games</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.gridContent} showsVerticalScrollIndicator={false}>
           {GAMES.map(game => {
@@ -326,4 +458,47 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#6B7280' },
   emptyBody: { fontSize: 14, color: '#9CA3AF', textAlign: 'center', paddingHorizontal: 40 },
+
+  // Tab toggle
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  tabBtnActive: { backgroundColor: '#6366F1' },
+  tabBtnText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  tabBtnTextActive: { color: '#FFFFFF' },
+
+  // Session result cards
+  sessionGameCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sessionGameHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  sessionGameName: { fontSize: 14, fontWeight: '700' },
+  sessionMetricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  sessionMetricItem: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 8,
+    minWidth: 90,
+  },
+  sessionMetricLabel: { fontSize: 10, color: '#9CA3AF', marginBottom: 2, textTransform: 'uppercase' },
+  sessionMetricValue: { fontSize: 14, fontWeight: '700', color: '#1F2937' },
 });
+

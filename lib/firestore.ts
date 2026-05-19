@@ -189,6 +189,41 @@ export async function saveGameResult(
   }
 }
 
+export interface SessionSummary {
+  id: string;
+  startTime: string;
+  endTime: string;
+  games: Record<string, any>;
+  gameQueue: string[];
+}
+
+export async function fetchAllSessions(participantId: string): Promise<SessionSummary[]> {
+  if (!participantId) return [];
+  try {
+    const q = query(
+      collection(db, 'sessions'),
+      where('participantId', '==', participantId),
+      where('status', '==', 'complete'),
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+      .map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          startTime: (data.startTime ?? '') as string,
+          endTime: (data.endTime ?? '') as string,
+          games: (data.games ?? {}) as Record<string, any>,
+          gameQueue: (data.gameQueue ?? []) as string[],
+        };
+      })
+      .sort((a, b) => b.startTime.localeCompare(a.startTime));
+  } catch (e) {
+    console.log('[Firestore] fetchAllSessions error:', e);
+    return [];
+  }
+}
+
 /** Marks a partial session as abandoned so it no longer shows up as resumable. */
 export async function abandonPartialSession(docId: string): Promise<void> {
   try {
