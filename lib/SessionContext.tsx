@@ -26,7 +26,6 @@ export const GAME_NAMES: Record<string, string> = {
   walk_and_turn: 'Walk and Turn',
 };
 
-// Default metric values used for games not played in a partial session.
 const DEFAULT_GAME_METRICS: Record<string, Record<string, any>> = {
   visual_pursuit:   { apiSuccess: false, played: false },
   dsst:             { score: 0, accuracy: 0, totalAttempts: 0, played: false },
@@ -40,15 +39,8 @@ const DEFAULT_GAME_METRICS: Record<string, Record<string, any>> = {
 };
 
 const ALL_GAMES = [
-  'visual_pursuit',
-  'dsst',
-  'tongue_twister',
-  'choice_reaction',
-  'stroop_naming',
-  'trail_task',
-  'typing_game',
-  'single_leg_stand',
-  'walk_and_turn',
+  'visual_pursuit', 'dsst', 'tongue_twister', 'choice_reaction', 'stroop_naming',
+  'trail_task', 'typing_game', 'single_leg_stand', 'walk_and_turn',
 ];
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -84,78 +76,172 @@ interface SessionContextType {
   getCompletedCount: () => number;
   resetSession: () => void;
   savePartialSession: () => void;
+  getPartialSessionId: () => string | null;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [sessionMode, setSessionMode] = useState<'individual' | 'full_session'>('individual');
+  const [sessionMode, setSessionModeState] = useState<'individual' | 'full_session'>('individual');
+  const sessionModeRef = useRef<'individual' | 'full_session'>('individual');
+
   const [sessionResults, setSessionResults] = useState<Record<string, any>>({});
   const sessionResultsRef = useRef<Record<string, any>>({});
-  // Background API jobs (e.g. VP/TT analysis during session) — not state to avoid re-renders
+
   const pendingJobsRef = useRef<Promise<void>[]>([]);
+
   const [sessionGameTimes, setSessionGameTimes] = useState<Record<string, string>>({});
   const sessionGameTimesRef = useRef<Record<string, string>>({});
+
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const sessionStartTimeRef = useRef<Date | null>(null);
+
   const [gameQueue, setGameQueue] = useState<string[]>([]);
   const gameQueueRef = useRef<string[]>([]);
+
   const [currentGameIndex, setCurrentGameIndex] = useState(0);
-  // Ref mirrors currentGameIndex but updates synchronously — prevents stale-closure
-  // bugs in isLastGame/getCurrentGame/getNextGame called right after completeGame.
   const currentGameIndexRef = useRef(0);
+
   const [sessionId, setSessionId] = useState<string | null>(null);
-  // Stores the Firestore doc ID of the partial session being resumed, so the final
-  // save updates that document instead of creating a new one.
+
   const [partialSessionId, setPartialSessionId] = useState<string | null>(null);
+  // Ref mirrors partialSessionId so savePartialSession always reads the latest value
+  // even when called immediately after setPartialSessionId (before React re-renders).
+  const partialSessionIdRef = useRef<string | null>(null);
+
+  // ── helpers ──────────────────────────────────────────────────────────────────
+
+  const setSessionMode = (mode: 'individual' | 'full_session') => {
+    sessionModeRef.current = mode;
+    setSessionModeState(mode);
+  };
+
+  const setPartialSessionIdSync = (id: string | null) => {
+    partialSessionIdRef.current = id;
+    setPartialSessionId(id);
+  };
+
+  // ── core session actions ──────────────────────────────────────────────────────
 
   const startSession = () => {
     const queue = shuffleArray(ALL_GAMES);
-    const id = `session_${Date.now()}`;
     const now = new Date();
-    setSessionMode('full_session');
-    setGameQueue(queue);
+    sessionModeRef.current = 'full_session';
+    setSessionModeState('full_session');
     gameQueueRef.current = queue;
+    setGameQueue(queue);
     currentGameIndexRef.current = 0;
     setCurrentGameIndex(0);
-    setSessionResults({});
     sessionResultsRef.current = {};
-    setSessionGameTimes({});
+    setSessionResults({});
     sessionGameTimesRef.current = {};
-    setSessionStartTime(now);
+    setSessionGameTimes({});
     sessionStartTimeRef.current = now;
-    setSessionId(id);
-    setPartialSessionId(null);  // ensure dismissed/stale partial IDs never carry over
+    setSessionStartTime(now);
+    setSessionId(`session_${Date.now()}`);
+    partialSessionIdRef.current = null;
+    setPartialSessionId(null);
     pendingJobsRef.current = [];
   };
 
-  const completeGame = (gameType: string, metrics: any, startTime?: Date) => {
-    setSessionResults(prev => {
-      const next = { ...prev, [gameType]: metrics };
-      sessionResultsRef.current = next;
-      return next;
-    });
-    if (startTime) {
-      const iso = startTime.toISOString();
-      setSessionGameTimes(prev => {
-        const next = { ...prev, [gameType]: iso };
-        sessionGameTimesRef.current = next;
-        return next;
-      });
+  const resumeSession = (partial: import('./firestore').PartialSessionDoc) => {
+    const playedResults: Record<string, any> = {};
+    for (const game of partial.gameQueue) {
+      if (partial.gameTimes[game] !== undefined) {
+        playedResults[game] = partial.games[game] ?? {};
+      }
     }
-    currentGameIndexRef.current += 1;
-    setCurrentGameIndex(currentGameIndexRef.current);
+    const start = new Date(partial.startTime);
+
+    sessionModeRef.current = 'full_session';
+    setSessionModeState('full_session');
+    gameQueueRef.current = partial.gameQueue;
+    setGameQueue(partial.gameQueue);
+    currentGameIndexRef.current = partial.gamesCompleted;
+    setCurrentGameIndex(partial.gamesCompleted);
+    sessionResultsRef.current = playedResults;
+    setSessionResults(playedResults);
+    sessionGameTimesRef.current = partial.gameTimes;
+    setSessionGameTimes(partial.gameTimes);
+    sessionStartTimeRef.current = start;
+    setSessionStartTime(start);
+    partialSessionIdRef.current = partial.id;
+    setPartialSessionId(partial.id);
+    setSessionId(partial.id);
   };
 
-  // Merge updates into an already-completed game's metrics (used by background jobs
-  // that finish after completeGame has already been called with placeholder data).
-  const updateGameResult = (gameType: string, updates: Record<string, any>) => {
-    setSessionResults(prev => {
-      const next = { ...prev, [gameType]: { ...(prev[gameType] ?? {}), ...updates } };
-      sessionResultsRef.current = next;
-      return next;
-    });
+  // ── savePartialSession ────────────────────────────────────────────────────────
+  // Reads exclusively from refs so it is safe to call at any point — immediately
+  // after completeGame, from a BackHandler, or from an individual game's back button.
+  // Uses partialSessionIdRef so it always targets the right Firestore doc even when
+  // called before React has had a chance to re-render with the updated state.
+  const savePartialSession = () => {
+    const startTime = sessionStartTimeRef.current;
+    const queue = gameQueueRef.current;
+    if (!startTime || queue.length === 0) return;
+
+    const results = sessionResultsRef.current;
+    const paddedResults: Record<string, any> = {};
+    for (const game of queue) {
+      paddedResults[game] = results[game] ?? DEFAULT_GAME_METRICS[game] ?? { played: false };
+    }
+
+    saveSession(
+      EMPATICA_PARTICIPANT.fullId,
+      startTime,
+      new Date(),
+      paddedResults,
+      sessionGameTimesRef.current,
+      'partial',
+      queue,
+      partialSessionIdRef.current ?? undefined,   // use ref — always current
+    ).then(id => {
+      if (id) setPartialSessionIdSync(id);         // update ref + state together
+    }).catch(e => console.log('[Session] Partial save error:', e));
   };
+
+  // ── completeGame ─────────────────────────────────────────────────────────────
+  // Updates refs synchronously (before state) so savePartialSession called
+  // immediately after sees the new data.
+  const completeGame = (gameType: string, metrics: any, startTime?: Date) => {
+    // Update refs first so any subsequent call to savePartialSession is accurate
+    const newResults = { ...sessionResultsRef.current, [gameType]: metrics };
+    sessionResultsRef.current = newResults;
+    setSessionResults(newResults);
+
+    if (startTime) {
+      const iso = startTime.toISOString();
+      const newTimes = { ...sessionGameTimesRef.current, [gameType]: iso };
+      sessionGameTimesRef.current = newTimes;
+      setSessionGameTimes(newTimes);
+    }
+
+    currentGameIndexRef.current += 1;
+    setCurrentGameIndex(currentGameIndexRef.current);
+
+    // Auto-save after every completed game so no data is ever lost mid-session.
+    if (sessionModeRef.current === 'full_session') {
+      savePartialSession();
+    }
+  };
+
+  // ── updateGameResult ──────────────────────────────────────────────────────────
+  // Called by background jobs (VP/TT analysis) after completeGame.
+  // Also triggers a partial save so the updated data reaches Firestore immediately.
+  const updateGameResult = (gameType: string, updates: Record<string, any>) => {
+    const newResults = {
+      ...sessionResultsRef.current,
+      [gameType]: { ...(sessionResultsRef.current[gameType] ?? {}), ...updates },
+    };
+    sessionResultsRef.current = newResults;
+    setSessionResults(newResults);
+
+    if (sessionModeRef.current === 'full_session') {
+      savePartialSession();
+    }
+  };
+
+  // ── pending jobs ──────────────────────────────────────────────────────────────
 
   const addPendingJob = (job: Promise<void>) => {
     pendingJobsRef.current = [...pendingJobsRef.current, job];
@@ -169,86 +255,35 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const hasPendingJobs = () => pendingJobsRef.current.length > 0;
 
-  // Restores a previously saved partial session so the user can continue from where they left off.
-  const resumeSession = (partial: import('./firestore').PartialSessionDoc) => {
-    const firstUnplayedIndex = partial.gamesCompleted;
+  // ── navigation helpers ────────────────────────────────────────────────────────
 
-    setSessionMode('full_session');
-    setGameQueue(partial.gameQueue);
-    gameQueueRef.current = partial.gameQueue;
-    currentGameIndexRef.current = firstUnplayedIndex;
-    setCurrentGameIndex(firstUnplayedIndex);
+  // Reads partialSessionIdRef synchronously — safe to call from background jobs
+  // even after resetSession() has been called.
+  const getPartialSessionId = () => partialSessionIdRef.current;
 
-    // Pre-populate results for already-played games (so the final save has complete data)
-    const playedResults: Record<string, any> = {};
-    for (const game of partial.gameQueue) {
-      if (partial.gameTimes[game] !== undefined) {
-        playedResults[game] = partial.games[game] ?? {};
-      }
-    }
-    setSessionResults(playedResults);
-    sessionResultsRef.current = playedResults;
-
-    setSessionGameTimes(partial.gameTimes);
-    sessionGameTimesRef.current = partial.gameTimes;
-
-    const start = new Date(partial.startTime);
-    setSessionStartTime(start);
-    sessionStartTimeRef.current = start;
-
-    setPartialSessionId(partial.id);
-    setSessionId(partial.id);
-  };
-
-  const savePartialSession = () => {
-    const startTime = sessionStartTimeRef.current;
-    const queue = gameQueueRef.current;
-    // Save as long as the session was started — even if no game was completed yet.
-    if (!startTime || queue.length === 0) return;
-    const results = sessionResultsRef.current;
-    const paddedResults: Record<string, any> = {};
-    for (const game of queue) {
-      paddedResults[game] = results[game] ?? DEFAULT_GAME_METRICS[game] ?? { played: false };
-    }
-    saveSession(
-      EMPATICA_PARTICIPANT.fullId,
-      startTime,
-      new Date(),
-      paddedResults,
-      sessionGameTimesRef.current,
-      'partial',
-      queue,
-      partialSessionId ?? undefined,
-    ).then(id => {
-      if (id) setPartialSessionId(id);
-    }).catch(e => console.log('[Session] Partial save error:', e));
-  };
-
-  // All navigation helpers read from refs so they reflect the updated index
-  // even when called in the same tick as completeGame (before React re-renders).
-  // isLastGame is called AFTER completeGame has already incremented the ref,
-  // so we compare against the full length (not length-1).
   const isLastGame = () => currentGameIndexRef.current >= gameQueueRef.current.length;
   const getCurrentGame = () => gameQueueRef.current[currentGameIndexRef.current] ?? null;
-  // After completeGame increments the index, getCurrentGame IS the next game to play.
   const getNextGame = () => gameQueueRef.current[currentGameIndexRef.current] ?? null;
-  // The game that was just finished (one step behind current).
   const getLastCompletedGame = () => gameQueueRef.current[currentGameIndexRef.current - 1] ?? null;
   const getCompletedCount = () => currentGameIndexRef.current;
 
+  // ── reset ─────────────────────────────────────────────────────────────────────
+
   const resetSession = () => {
-    setSessionMode('individual');
-    setSessionResults({});
+    sessionModeRef.current = 'individual';
+    setSessionModeState('individual');
     sessionResultsRef.current = {};
-    setSessionGameTimes({});
+    setSessionResults({});
     sessionGameTimesRef.current = {};
-    setSessionStartTime(null);
+    setSessionGameTimes({});
     sessionStartTimeRef.current = null;
-    setGameQueue([]);
+    setSessionStartTime(null);
     gameQueueRef.current = [];
+    setGameQueue([]);
     currentGameIndexRef.current = 0;
     setCurrentGameIndex(0);
     setSessionId(null);
+    partialSessionIdRef.current = null;
     setPartialSessionId(null);
     pendingJobsRef.current = [];
   };
@@ -278,6 +313,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       getCompletedCount,
       resetSession,
       savePartialSession,
+      getPartialSessionId,
     }}>
       {children}
     </SessionContext.Provider>

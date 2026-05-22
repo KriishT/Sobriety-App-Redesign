@@ -35,6 +35,7 @@ export async function saveSession(
 
     const data: Record<string, any> = {
       participantId,
+      userUid:   auth.currentUser?.uid   ?? null,
       userEmail: auth.currentUser?.email ?? null,
       mode: 'full_session',
       status,

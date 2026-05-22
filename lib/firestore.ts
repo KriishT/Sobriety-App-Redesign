@@ -53,18 +53,21 @@ export interface HistoryPoint {
 
 export async function fetchGameHistory(
   gameType: string,
-  participantId: string,
+  _participantId?: string,
 ): Promise<HistoryPoint[]> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
   try {
+    // Single-field query only (userUid) — gameType filtered client-side to avoid composite index
     const q = query(
       collection(db, 'game_results'),
-      where('gameType', '==', gameType),
-      where('participantId', '==', participantId),
+      where('userUid', '==', uid),
     );
     const snap = await getDocs(q);
     const points: HistoryPoint[] = [];
     snap.docs.forEach(doc => {
       const d = doc.data();
+      if (d.gameType !== gameType) return;  // client-side gameType filter
       const value = extractPrimaryScore(gameType, d.metrics);
       if (value !== null && d.startTime) {
         points.push({ date: d.startTime, value });
@@ -86,17 +89,19 @@ export interface HistoricalRecord {
 
 export async function fetchGameHistoryFull(
   gameType: string,
-  participantId: string,
+  _participantId?: string,
   sessionType?: 'individual' | 'full_session',
 ): Promise<HistoricalRecord[]> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
   try {
     const q = query(
       collection(db, 'game_results'),
-      where('gameType', '==', gameType),
-      where('participantId', '==', participantId),
+      where('userUid', '==', uid),
     );
     const snap = await getDocs(q);
     return snap.docs
+      .filter(doc => doc.data().gameType === gameType)
       .map(doc => {
         const d = doc.data();
         return {
@@ -123,12 +128,14 @@ export async function fetchGameHistoryFull(
 // Each session document has a `games` map; this extracts the entry for the given gameType.
 export async function fetchSessionGameHistory(
   gameType: string,
-  participantId: string,
+  _participantId: string,
 ): Promise<HistoricalRecord[]> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
   try {
     const q = query(
       collection(db, 'sessions'),
-      where('participantId', '==', participantId),
+      where('userUid', '==', uid),
     );
     const snap = await getDocs(q);
     return snap.docs
@@ -163,6 +170,7 @@ export async function saveGameResult(
     const docRef = await addDoc(collection(db, 'game_results'), {
       gameType,
       participantId,
+      userUid:   auth.currentUser?.uid   ?? null,
       userEmail: auth.currentUser?.email ?? null,
       sessionType,
       startTime: startTime.toISOString(),
@@ -198,13 +206,13 @@ export interface SessionSummary {
   gameQueue: string[];
 }
 
-export async function fetchAllSessions(participantId: string): Promise<SessionSummary[]> {
-  if (!participantId) return [];
+export async function fetchAllSessions(_participantId?: string): Promise<SessionSummary[]> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
   try {
     const q = query(
       collection(db, 'sessions'),
-      where('participantId', '==', participantId),
-      where('status', '==', 'complete'),
+      where('userUid', '==', uid),
     );
     const snap = await getDocs(q);
     return snap.docs
@@ -216,12 +224,32 @@ export async function fetchAllSessions(participantId: string): Promise<SessionSu
           endTime: (data.endTime ?? '') as string,
           games: (data.games ?? {}) as Record<string, any>,
           gameQueue: (data.gameQueue ?? []) as string[],
+          status: (data.status ?? '') as string,
         };
       })
+      .filter(d => d.status === 'complete')
       .sort((a, b) => b.startTime.localeCompare(a.startTime));
   } catch (e) {
     console.log('[Firestore] fetchAllSessions error:', e);
     return [];
+  }
+}
+
+/** Directly patches a single game's metrics inside a session document.
+ *  Used by background jobs (e.g. VP video upload) that finish after the session
+ *  context may have already been reset, so we can't rely on savePartialSession. */
+export async function updateSessionGameResult(
+  sessionDocId: string,
+  gameType: string,
+  metrics: Record<string, any>,
+): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'sessions', sessionDocId), {
+      [`games.${gameType}`]: metrics,
+    });
+    console.log(`[Firestore] Patched session ${sessionDocId} → games.${gameType}`);
+  } catch (e) {
+    console.log('[Firestore] updateSessionGameResult error:', e);
   }
 }
 
@@ -244,26 +272,28 @@ export interface PartialSessionDoc {
 }
 
 export async function fetchLatestPartialSession(
-  participantId: string,
+  _participantId?: string,
 ): Promise<PartialSessionDoc | null> {
-  if (!participantId) return null;
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
   try {
-    // Single-field queries only — no composite index needed.
-    // We filter by status client-side and pick the most recent by startTime.
+    // Single-field query — filters status='partial' client-side to avoid composite index.
     const q = query(
       collection(db, 'sessions'),
-      where('participantId', '==', participantId),
-      where('status', '==', 'partial'),
+      where('userUid', '==', uid),
     );
     const snap = await getDocs(q);
     if (snap.empty) return null;
-    // Sort client-side to get the most recent partial session
-    const sorted = snap.docs.sort((a, b) => {
-      const aT = (a.data().startTime as string) ?? '';
-      const bT = (b.data().startTime as string) ?? '';
-      return bT.localeCompare(aT);
-    });
-    const d = sorted[0];
+    // Filter status='partial' and sort to get the most recent
+    const partialDocs = snap.docs
+      .filter(d => d.data().status === 'partial')
+      .sort((a, b) => {
+        const aT = (a.data().startTime as string) ?? '';
+        const bT = (b.data().startTime as string) ?? '';
+        return bT.localeCompare(aT);
+      });
+    if (partialDocs.length === 0) return null;
+    const d = partialDocs[0];
     const data = d.data();
     const gameTimes = (data.gameTimes ?? {}) as Record<string, string>;
     return {

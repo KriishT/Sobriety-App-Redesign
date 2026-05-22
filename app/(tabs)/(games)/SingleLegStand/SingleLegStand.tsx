@@ -11,9 +11,12 @@ import { useRouter } from 'expo-router';
 import { Gyroscope } from 'expo-sensors';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, ms, vs } from '@/lib/scale';
+
+const SCREEN_W = Dimensions.get('window').width;
+const SLS_INSTR = require('@/assets/inst_images/SLS_instr.jpg');
 
 export default function SingleLegStand() {
   const [countdown, setCountdown] = useState(false);
@@ -162,53 +165,48 @@ export default function SingleLegStand() {
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.iconContainer} />
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Logo */}
+            <View style={styles.iconContainer}>
+              <Ionicons name="person-outline" size={64} color="#EC4899" />
+            </View>
 
             <Text style={styles.instructionTitle}>Single Leg Stand Test</Text>
-            
             <Text style={styles.instructionText}>
-              Stand on one leg and hold your balance for 10 seconds while we measure your stability.
+              Measures balance and stability to provide a clear indicator of your physical coordination.
             </Text>
 
-            {/* Rules */}
-            <View style={styles.rulesBox}>
-              <Text style={styles.rulesTitle}>Test Rules:</Text>
+            {/* How it works */}
+            <View style={styles.exampleBox}>
+              <Text style={styles.exampleLabel}>How it works:</Text>
+              {[
+                "Hold the phone in one hand with your arm extended straight out.",
+                "Stand on one leg and maintain balance for 10 seconds.",
+              ].map((text, i) => (
+                <View key={i} style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{text}</Text>
+                </View>
+              ))}
+            </View>
 
-              <View style={styles.rulesImageContainer}>
-                <Image
-                  source={require('../../../../assets/images/single-leg-stand.png')}
-                  style={styles.rulesImage}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Stretch out your arm with the smartwatch</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Hold your phone in the other hand and stretch it out as well</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Hold both arms out with palms facing up</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Keep the phone screen facing up so you can see the timer and know when to stop</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Stand on one leg for 10 seconds</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Try to minimize body movement</Text>
-              </View>
+            {/* Step illustration */}
+            <Image source={SLS_INSTR} style={styles.slsInstImg} resizeMode="contain" />
+
+            {/* Tips */}
+            <View style={styles.tipsBox}>
+              <Ionicons name="information-circle" size={20} color="#EC4899" style={{ marginBottom: 8 }} />
+              {[
+                "Keep both arms straight out to your sides.",
+                "Hold the phone flat on your palm, screen up.",
+              ].map((tip, i) => (
+                <View key={i} style={styles.tipRow}>
+                  <View style={styles.tipBullet} />
+                  <Text style={styles.tipText}>{tip}</Text>
+                </View>
+              ))}
             </View>
 
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
@@ -796,6 +794,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#EC4899',
+  },
+
+  slsInstImg: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 0.75,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  tipsBox: {
+    backgroundColor: '#FDF2F8',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  tipBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EC4899',
+    marginTop: 7,
+    marginRight: 10,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#9D174D',
+    lineHeight: 20,
   },
 });
 

@@ -1,5 +1,5 @@
 ﻿import { Countdown } from "@/components/Countdown";
-import { scale, ms, vs } from '@/lib/scale';
+import { ms } from '@/lib/scale';
 import { ScoreTrendCard } from "@/components/ScoreTrendCard";
 import { saveGameResult } from "@/lib/firestore";
 import { EMPATICA_PARTICIPANT } from "@/lib/empaticaConfig";
@@ -10,8 +10,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const SN_INSTR = require('@/assets/inst_images/SN_instr.jpg');
 
 export default function StroopNaming() {
   const router = useRouter();
@@ -138,22 +140,49 @@ export default function StroopNaming() {
       <View style={styles.gameArea}>
         {/* START SCREEN */}
         {!gameStarted && !gameOver && (
-          <View style={styles.startScreen}>
+          <ScrollView style={{ width: '100%' }} contentContainerStyle={styles.startScreen} showsVerticalScrollIndicator={false}>
+            {/* Logo */}
             <View style={styles.iconContainer}>
               <Ionicons name="text-outline" size={64} color="#3B82F6" />
             </View>
+
             <Text style={styles.instructionTitle}>Stroop Test</Text>
             <Text style={styles.instructionText}>
-              A word will appear at the top. Choose the answer that matches the{" "}
-              <Text style={styles.boldText}>COLOR</Text> of the word, not what
-              the text says.
+              Evaluates cognitive flexibility, interference control, and time perception to assess your cognitive impairment.
             </Text>
+
+            {/* How it works */}
+            <View style={styles.snHowBox}>
+              <Text style={styles.snHowLabel}>How it works:</Text>
+              {[
+                "Ignore the word's meaning and tap the text's actual color.",
+                'Stop the test when you estimate 30 seconds have passed.',
+              ].map((text, i) => (
+                <View key={i} style={styles.snStep}>
+                  <View style={styles.snStepNum}>
+                    <Text style={styles.snStepNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.snStepText}>{text}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Step illustration */}
+            <Image source={SN_INSTR} style={styles.snInstImg} resizeMode="contain" />
+
+            {/* Tip */}
+            <View style={styles.snTipBox}>
+              <Ionicons name="information-circle" size={20} color="#3B82F6" style={{ marginBottom: 6 }} />
+              <Text style={styles.snTipText}>
+                Tap STOP when you estimate 30 seconds have passed.
+              </Text>
+            </View>
 
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
               <Text style={styles.startButtonText}>Begin Test</Text>
               <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         )}
 
         {/* PLAY SCREEN */}
@@ -299,15 +328,12 @@ const styles = StyleSheet.create({
   },
   gameArea: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
   },
 
   // START SCREEN
   startScreen: {
-    alignItems: "center",
-    paddingHorizontal: 40,
+    padding: 20,
+    paddingBottom: 40,
   },
   iconContainer: {
     width: 120,
@@ -316,6 +342,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "center",
     marginBottom: 30,
   },
   instructionTitle: {
@@ -323,13 +350,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1F2937",
     marginBottom: 16,
+    textAlign: "center",
   },
   instructionText: {
     fontSize: 16,
     color: "#6B7280",
     textAlign: "center",
     lineHeight: 24,
-    marginBottom: 30,
+    marginBottom: 20,
+    paddingHorizontal: 8,
   },
   boldText: {
     fontWeight: "700",
@@ -374,8 +403,10 @@ const styles = StyleSheet.create({
 
   // PLAY SCREEN
   playScreen: {
+    flex: 1,
     width: "100%",
     alignItems: "center",
+    padding: 20,
   },
   statsContainer: {
     flexDirection: "row",
@@ -542,6 +573,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+
+  snHowBox:      { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20 },
+  snHowLabel:    { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 16, textAlign: 'center' },
+  snStep:        { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  snStepNum:     { width: 30, height: 30, borderRadius: 15, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  snStepNumText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  snStepText:    { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
+  snInstImg: {
+    width: '120%',
+    alignSelf: 'center',
+    marginHorizontal: '-10%',
+    height: undefined,
+    aspectRatio: 1.6,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  snTipBox: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  snTipText: {
+    fontSize: 13,
+    color: '#1E40AF',
+    lineHeight: 20,
   },
 });
 

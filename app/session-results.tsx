@@ -21,7 +21,17 @@ const GAME_ICONS: Record<string, string> = {
 };
 
 const GAME_KEY_METRICS: Record<string, string[]> = {
-  visual_pursuit: ['apiSuccess', 'portrait.xNystagmus', 'landscape.xNystagmus'],
+  visual_pursuit: [
+    'apiSuccess',
+    'rounds.vertical_left.pupilDetected',
+    'rounds.vertical_right.pupilDetected',
+    'rounds.horizontal_left.pupilDetected',
+    'rounds.horizontal_right.pupilDetected',
+    'videoUrls.vertical_left',
+    'videoUrls.vertical_right',
+    'videoUrls.horizontal_left',
+    'videoUrls.horizontal_right',
+  ],
   dsst: ['score', 'accuracy', 'totalAttempts'],
   tongue_twister: ['phrasesCompleted', 'avgJitter', 'avgSpeakingRate'],
   choice_reaction: ['avgPressReactionTimeMs', 'errors', 'totalRounds'],

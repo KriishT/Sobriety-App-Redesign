@@ -436,12 +436,32 @@ export default function DSST() {
 
           <Text style={s.bigTitle}>Digit Symbol Substitution Test</Text>
           <Text style={s.subText}>
-            Each digit 0–9 maps to a symbol. When shown a number, draw its
-            symbol by connecting the dots — just like a phone pattern lock.
+            Assesses processing speed and working memory to evaluate your current cognitive acuity.
           </Text>
 
+          {/* How it works */}
+          <View style={s.howItWorksCard}>
+            <Text style={s.cardTitle}>How it works:</Text>
+            {[
+              'Check the reference table to find the symbol for the displayed digit.',
+              'Draw the symbol on the grid and tap Submit to continue.',
+              'Complete as many as possible within 30 seconds.',
+            ].map((text, i) => (
+              <View key={i} style={s.howStep}>
+                <View style={s.howStepNum}>
+                  <Text style={s.howStepNumText}>{i + 1}</Text>
+                </View>
+                <Text style={s.howStepText}>{text}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Symbol reference table */}
           <View style={s.card}>
             <Text style={s.cardTitle}>All 20 symbols — learn them before playing</Text>
+            <Text style={s.familiarizeNote}>
+              Take a moment to familiarize yourself with the symbols before starting.
+            </Text>
             {CANONICAL_SEQS.map((_, i) => (
               <View key={i} style={s.symbolRow}>
                 <MiniPreview symIdx={i} size={72} showDots={true} />
@@ -452,10 +472,11 @@ export default function DSST() {
             ))}
           </View>
 
+          {/* Tips */}
           <View style={s.rulesCard}>
-            <Text style={s.rulesTitle}>Rules</Text>
+            <Ionicons name="information-circle" size={20} color="#8B5CF6" style={{ marginBottom: 8 }} />
             {[
-              'At the start of each session, the game will randomly choose 10 of the 20 above symbols.',
+              'At the start of each session, the system will randomly choose 10 of the 20 above symbols.',
               'These symbols will remain unchanged throughout your current session.',
             ].map((r, i) => (
               <View key={i} style={s.ruleRow}>
@@ -827,6 +848,13 @@ const s = StyleSheet.create({
   statDivider:{ width: 1, height: 36, backgroundColor: '#E5E7EB' },
   statLabel:  { fontSize: 11, color: '#6B7280', marginBottom: 4 },
   statValue:  { fontSize: 20, fontWeight: '700', color: '#1F2937' },
+
+  howItWorksCard: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20 },
+  howStep:        { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  howStepNum:     { width: 30, height: 30, borderRadius: 15, backgroundColor: '#8B5CF6', alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  howStepNumText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  howStepText:    { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
+  familiarizeNote:{ fontSize: 13, color: '#6B7280', fontStyle: 'italic', marginBottom: 16, lineHeight: 18 },
 });
 
 

@@ -11,6 +11,8 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
+  Dimensions,
+  Image,
   Keyboard,
   ScrollView,
   StyleSheet,
@@ -20,6 +22,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const SCREEN_W = Dimensions.get('window').width;
+const TC_INSTR = require('@/assets/inst_images/TC_instr.jpg');
 
 export default function TypingChallenge() {
   const router = useRouter();
@@ -229,20 +234,40 @@ export default function TypingChallenge() {
             contentContainerStyle={styles.startScreen}
             showsVerticalScrollIndicator={false}
           >
+            {/* Logo */}
             <View style={styles.iconContainer}>
               <Ionicons name="rocket-outline" size={64} color="#10B981" />
             </View>
-            <Text style={styles.instructionTitle}>Typing Speed Test</Text>
+
+            <Text style={styles.instructionTitle}>Typing Challenge Test</Text>
             <Text style={styles.instructionText}>
-              Type the sentences that appear as quickly and accurately as
-              possible. Press <Text style={styles.boldText}>Submit</Text> after
-              each sentence.
+              Tracks keystroke accuracy and fine motor skills to measure your manual dexterity and focus.
             </Text>
 
+            {/* How it works */}
+            <View style={styles.exampleBox}>
+              <Text style={styles.exampleLabel}>How it works:</Text>
+              {[
+                'Type the text shown on the screen.',
+                'Type as accurately and quickly as possible within 60 seconds.',
+              ].map((text, i) => (
+                <View key={i} style={styles.tcStep}>
+                  <View style={styles.tcStepNum}>
+                    <Text style={styles.tcStepNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.tcStepText}>{text}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Step illustration */}
+            <Image source={TC_INSTR} style={styles.tcInstImg} resizeMode="contain" />
+
+            {/* Tip */}
             <View style={styles.autocorrectWarning}>
-              <Ionicons name="warning-outline" size={18} color="#92400E" />
+              <Ionicons name="information-circle" size={20} color="#10B981" />
               <Text style={styles.autocorrectWarningText}>
-                Please disable autocorrect and autocomplete on your keyboard before starting. On most Android keyboards: tap the Settings icon on the keyboard → Text correction → turn off Auto-correction and Next-word suggestions.
+                Turn off Auto-correction and Next-word suggestions in your keyboard settings before starting the test.
               </Text>
             </View>
 
@@ -800,6 +825,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#92400E",
     lineHeight: 19,
+  },
+
+  tcStep:        { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  tcStepNum:     { width: 30, height: 30, borderRadius: 15, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  tcStepNumText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  tcStepText:    { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
+  tcInstImg: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 1.25,
+    borderRadius: 8,
+    marginBottom: 16,
   },
 });
 

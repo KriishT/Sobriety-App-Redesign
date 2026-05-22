@@ -1,4 +1,4 @@
-﻿import { saveGameResult } from "@/lib/firestore";
+﻿import { saveGameResult, updateSessionGameResult } from "@/lib/firestore";
 import { EMPATICA_PARTICIPANT } from "@/lib/empaticaConfig";
 import { uploadVideo } from "@/lib/firebaseStorage";
 import * as FileSystem from 'expo-file-system/legacy';
@@ -19,6 +19,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image } from "react-native";
+
+const INST1 = require('@/assets/inst_images/vp_inst1.jpg');  // portrait steps (1 & 2)
+const INST2 = require('@/assets/inst_images/vp_inst2.jpg');  // landscape steps (3 & 4)
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const BALL_SIZE = 36;
@@ -112,17 +116,261 @@ function getRoundFromPhase(p: TestPhase): RoundKey | null {
   return null;
 }
 
+// ─── step illustration components ────────────────────────────────────────────
+// inst1.jpg = portrait steps (1 & 2), inst2.jpg = landscape steps (3 & 4)
+
+const introStyles = StyleSheet.create({
+  stepCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+  stepBadge: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  stepBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#3B82F6',
+    letterSpacing: 0.5,
+  },
+  stepTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+  },
+  cardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  // Portrait phone wrap
+  phoneWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  phoneAsset: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ballOverlayPortrait: {
+    position: 'absolute',
+    top: 28,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#F59E0B',
+  },
+  arrowPortrait: {
+    position: 'absolute',
+    top: 40,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 2,
+  },
+  // Landscape phone wrap
+  phoneWrapLandscape: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  phoneAssetLandscape: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ballOverlayLandscape: {
+    position: 'absolute',
+    left: 30,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#F59E0B',
+  },
+  arrowLandscape: {
+    position: 'absolute',
+    left: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  // Camera / eye tags on illustrations
+  cameraTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  cameraTagText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  eyeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  eyeTagLeft: { alignSelf: 'flex-start' },
+  eyeTagRight: { alignSelf: 'flex-end' },
+  eyeTagText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  // Right-side label column
+  labelCol: {
+    flex: 1,
+    gap: 6,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  eyeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  eyeLabelText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6366F1',
+  },
+  cameraLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  cameraLabelText: {
+    fontSize: 11,
+    color: '#3B82F6',
+    fontWeight: '500',
+    flex: 1,
+  },
+  labelInstruction: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  cameraNoteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 12 },
+  cameraNoteText: { fontSize: 12, color: '#3B82F6', fontWeight: '500' },
+
+  // Illustration container
+  illWrap: {
+    alignItems: 'center',
+    gap: 6,
+    width: 130,
+  },
+  instImg: {
+    width: 120,
+    height: 150,
+    borderRadius: 8,
+  },
+  fullImgPortrait: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 0.75,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  fullImgLandscape: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 0.75,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  // Light card behind the phone image
+  phoneCard: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 90,
+    height: 130,
+  },
+  phoneCardLandscape: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 130,
+    height: 80,
+  },
+  phoneImgPortrait: {
+    width: 72,
+    height: 112,
+  },
+  phoneImgLandscape: {
+    width: 112,
+    height: 62,
+  },
+  eyeImg: {
+    width: 12,
+    height: 12,
+  },
+  // Small label chip
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    alignSelf: 'center',
+  },
+  chipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+});
+
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function VisualPursuit() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const { sessionMode, completeGame, updateGameResult, addPendingJob, isLastGame } = useSession();
+  const { sessionMode, completeGame, updateGameResult, addPendingJob, isLastGame, getPartialSessionId } = useSession();
   const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<TestPhase>("intro");
   const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
-  const [roundResults, setRoundResults] = useState<{ videoUrl: string | null; apiSuccess: boolean } | null>(null);
+  const [roundResults, setRoundResults] = useState<{
+    apiSuccess: boolean;
+    rounds: Record<RoundKey, {
+      videoUrl: string | null;
+      apiSuccess: boolean;
+      totalFrames?: number;
+      pupilDetected?: number;
+      irisDetected?: number;
+      durationSeconds?: number;
+    }>;
+  } | null>(null);
 
   const cameraRef = useRef<CameraView>(null);
   const gameStartTimeRef = useRef<Date | null>(null);
@@ -325,13 +573,91 @@ export default function VisualPursuit() {
       Object.entries(roundStartTimesRef.current).map(([k, v]) => [k, v?.toISOString() ?? null]),
     );
 
-    // Sequential uploads — parallel large video uploads overwhelm the connection
+    // Downloads frames.json from the API and computes nystagmus metrics from
+    // the per-frame gaze_offset_px (pupil_center minus iris_center).
+    const computeNystagmus = async (jsonUrl: string): Promise<Record<string, any> | null> => {
+      try {
+        const res = await fetch(jsonUrl);
+        if (!res.ok) { console.log('[VP] frames.json fetch failed:', res.status); return null; }
+        const data = await res.json();
+        const frames: any[] = data.frames ?? [];
+
+        // Only frames where both pupil and iris were detected have a gaze offset
+        const offsets = frames
+          .map((f: any) => f.gaze_offset_px)
+          .filter((g: any) => Array.isArray(g) && g.length === 2);
+
+        if (offsets.length < 3) return null;   // not enough data
+
+        const xs = offsets.map((g: number[]) => g[0]);
+        const ys = offsets.map((g: number[]) => g[1]);
+
+        const mean  = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+        const std   = (a: number[], m: number) =>
+          Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length);
+        const round1 = (n: number) => Math.round(n * 10) / 10;
+
+        const avgX = mean(xs), avgY = mean(ys);
+
+        // Direction changes in the gaze signal = oscillation frequency proxy.
+        // A sign change in consecutive differences indicates a reversal.
+        const dirChanges = (arr: number[]) => {
+          let c = 0;
+          for (let i = 2; i < arr.length; i++) {
+            if ((arr[i] - arr[i - 1]) * (arr[i - 1] - arr[i - 2]) < 0) c++;
+          }
+          return c;
+        };
+
+        const xDirChanges = dirChanges(xs);
+        const yDirChanges = dirChanges(ys);
+        const xJitter = std(xs, avgX);
+        const yJitter = std(ys, avgY);
+
+        // Nystagmus intensity proxy: jitter × oscillation rate
+        // Higher = more involuntary oscillation detected
+        const fps = data.fps ?? 1;
+        const xNystagmus = round1(xJitter * (xDirChanges / (frames.length / fps)));
+        const yNystagmus = round1(yJitter * (yDirChanges / (frames.length / fps)));
+
+        return {
+          gazeFrames:       offsets.length,
+          xAmplitudePx:     round1(Math.max(...xs.map(Math.abs))),
+          yAmplitudePx:     round1(Math.max(...ys.map(Math.abs))),
+          xJitterPx:        round1(xJitter),
+          yJitterPx:        round1(yJitter),
+          avgGazeOffsetX:   round1(avgX),
+          avgGazeOffsetY:   round1(avgY),
+          xDirectionChanges: xDirChanges,
+          yDirectionChanges: yDirChanges,
+          xNystagmusScore:  xNystagmus,  // horizontal involuntary oscillation (HAN proxy)
+          yNystagmusScore:  yNystagmus,  // vertical involuntary oscillation (VAN proxy)
+        };
+      } catch (e) {
+        console.log('[VP] computeNystagmus error:', e);
+        return null;
+      }
+    };
+
+    // Upload video first (always), then call API, then download frames.json
+    // and compute nystagmus — all in sequence so nothing blocks the video save.
     const uploadRound = async (round: RoundKey) => {
       const uri = capturedUris[round];
-      if (!uri) return { round, videoUrl: null, rawApiResponse: null, apiSuccess: false };
-      const videoUrl = await uploadVideo(uri, EMPATICA_PARTICIPANT.fullId, "visual_pursuit", round).catch(() => null);
-      const apiResult = await analyzeVideo(uri).catch(() => null);
-      return { round, videoUrl, rawApiResponse: apiResult, apiSuccess: apiResult !== null };
+      if (!uri) return { round, videoUrl: null, apiResult: null, apiSuccess: false, nystagmus: null };
+      const videoUrl = await uploadVideo(uri, EMPATICA_PARTICIPANT.fullId, "visual_pursuit", round).catch(e => {
+        console.log(`[VP] Upload failed for ${round}:`, e);
+        return null;
+      });
+      const apiResult = await analyzeVideo(uri).catch(e => {
+        console.log(`[VP] API failed for ${round}:`, e);
+        return null;
+      });
+      // Download and process per-frame data immediately — the json_url is only
+      // valid while the API server is running (ngrok session).
+      const nystagmus = apiResult?.json_url
+        ? await computeNystagmus(`${API_BASE}${apiResult.json_url}`)
+        : null;
+      return { round, videoUrl, apiResult, apiSuccess: apiResult !== null, nystagmus };
     };
 
     const uploadAllSequential = async () => {
@@ -342,17 +668,56 @@ export default function VisualPursuit() {
       return results;
     };
 
+    // Builds the Firestore metrics object. Saves:
+    //   - videoUrls: flat map of all 4 video URLs (saved even if API failed)
+    //   - rounds: per-round video URL + API summary + nystagmus metrics
+    const buildMetrics = (results: Awaited<ReturnType<typeof uploadRound>>[]) => {
+      const videoUrls: Record<string, string | null> = {};
+      const rounds: Record<string, any> = {};
+      for (const r of results) {
+        videoUrls[r.round] = r.videoUrl;
+        rounds[r.round] = {
+          videoUrl:   r.videoUrl,
+          apiSuccess: r.apiSuccess,
+          ...(r.apiResult ? {
+            totalFrames:     r.apiResult.n_total_frames,
+            pupilDetected:   r.apiResult.n_pupil_detected,
+            irisDetected:    r.apiResult.n_iris_detected,
+            fps:             r.apiResult.fps,
+            durationSeconds: r.apiResult.duration_s,
+            csvUrl:  r.apiResult.csv_url  ? `${API_BASE}${r.apiResult.csv_url}`  : null,
+            jsonUrl: r.apiResult.json_url ? `${API_BASE}${r.apiResult.json_url}` : null,
+          } : {}),
+          ...(r.nystagmus ? { nystagmus: r.nystagmus } : {}),
+        };
+      }
+      return {
+        videoUrls,
+        rounds,
+        roundTimes,
+        apiSuccess: results.some(r => r.apiSuccess),
+      };
+    };
+
     if (sessionMode === "full_session") {
       completeGame("visual_pursuit", { apiSuccess: null }, capturedGameStart);
+      // Capture the partial session doc ID NOW — before the user navigates away and
+      // potentially resets the session context. Video uploads take 30-60 s and the
+      // context may be cleared long before they finish.
+      const sessionDocId = getPartialSessionId();
       if (isLastGame()) { router.replace("/session-results"); }
       else { router.replace("/session-transition"); }
 
       const job = (async (): Promise<void> => {
         const results = await uploadAllSequential();
-        const rounds = Object.fromEntries(results.map(r => [r.round, r]));
-        updateGameResult("visual_pursuit", {
-          rounds, roundTimes, apiSuccess: results.some(r => r.apiSuccess),
-        });
+        const metrics = buildMetrics(results);
+        // Update in-memory context (works if session is still active)
+        updateGameResult("visual_pursuit", metrics);
+        // Also patch Firestore directly — this works even if the session was
+        // abandoned and resetSession() has already been called.
+        if (sessionDocId) {
+          await updateSessionGameResult(sessionDocId, "visual_pursuit", metrics);
+        }
       })();
       addPendingJob(job);
       return;
@@ -361,13 +726,26 @@ export default function VisualPursuit() {
     // Individual mode — sequential uploads
     setPhase("analyzing");
     const results = await uploadAllSequential();
-    const rounds = Object.fromEntries(results.map(r => [r.round, r]));
     saveGameResult(
       "visual_pursuit", EMPATICA_PARTICIPANT.fullId, capturedGameStart, new Date(),
-      { rounds, roundTimes, apiSuccess: results.some(r => r.apiSuccess) },
+      buildMetrics(results),
       "individual",
     );
-    setRoundResults({ videoUrl: results[0]?.videoUrl ?? null, apiSuccess: results.some(r => r.apiSuccess) });
+    const roundMap: Record<string, any> = {};
+    for (const r of results) {
+      roundMap[r.round] = {
+        videoUrl: r.videoUrl,
+        apiSuccess: r.apiSuccess,
+        ...(r.apiResult ? {
+          totalFrames:   r.apiResult.n_total_frames,
+          pupilDetected: r.apiResult.n_pupil_detected,
+          irisDetected:  r.apiResult.n_iris_detected,
+          durationSeconds: r.apiResult.duration_s,
+        } : {}),
+        ...(r.nystagmus ? { nystagmus: r.nystagmus } : {}),
+      };
+    }
+    setRoundResults({ apiSuccess: results.some(r => r.apiSuccess), rounds: roundMap as any });
     setPhase("complete");
   };
 
@@ -439,57 +817,47 @@ export default function VisualPursuit() {
             </View>
           )}
 
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Logo + title */}
             <View style={styles.iconContainer}>
-              <Ionicons name="eye-outline" size={64} color="#6366F1" />
+              <Ionicons name="eye-outline" size={52} color="#6366F1" />
             </View>
             <Text style={styles.instructionTitle}>Visual Pursuit Test</Text>
             <Text style={styles.instructionText}>
-              Follow the moving ball with your eyes only. Do not move your head!
+              Analyzes involuntary eye movements to provide an objective assessment of your sobriety.
+            </Text>
+            <Text style={[styles.instructionText, { fontSize: 12, color: '#9CA3AF', marginTop: -8 }]}>
               The camera records your eye movements for AI analysis.
             </Text>
 
+            {/* How it works */}
             <View style={styles.exampleBox}>
-              <Text style={styles.exampleLabel}>4 Rounds:</Text>
-              <View style={styles.stepContainer}>
-                {[
-                  "Align LEFT eye (center) — ball moves center → up → center",
-                  "Align RIGHT eye (center) — ball moves center → up → center",
-                  "Align LEFT eye (top, near camera) — ball moves top → bottom → top",
-                  "Align RIGHT eye (top, near camera) — ball moves top → bottom → top",
-                ].map((text, i) => (
-                  <View key={i} style={styles.step}>
-                    <View style={styles.stepNumber}>
-                      <Text style={styles.stepNumberText}>{i + 1}</Text>
-                    </View>
-                    <Text style={styles.stepText}>{text}</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.exampleNote}>
-                <Ionicons name="information-circle" size={20} color="#6366F1" />
-                <Text style={styles.exampleNoteText}>
-                  Each round ends automatically when the ball returns to start
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.rulesBox}>
-              <Text style={styles.rulesTitle}>Rules:</Text>
+              <Text style={styles.exampleLabel}>How it works</Text>
               {[
-                "Keep your head completely still",
-                "Only move your eyes to follow the ball",
-                "Tap OK when your eye is aligned to start each round",
-                "Front camera records for AI analysis",
-              ].map((rule, i) => (
-                <View key={i} style={styles.rule}>
-                  <View style={styles.bulletPoint} />
-                  <Text style={styles.ruleText}>{rule}</Text>
+                "Vertical Scan: Track the ball with each eye for 15s (portrait).",
+                "Horizontal Scan: Track the ball with each eye for 15s (landscape).",
+                "AI Analysis: System processes your eye movement data.",
+                "View Results: Receive instant performance insights.",
+              ].map((text, i) => (
+                <View key={i} style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{text}</Text>
                 </View>
               ))}
+            </View>
+
+            {/* Step illustrations — images contain all step info */}
+            <Image source={INST1} style={introStyles.fullImgPortrait} resizeMode="contain" />
+            <Image source={INST2} style={introStyles.fullImgLandscape} resizeMode="contain" />
+
+            {/* Warning */}
+            <View style={styles.exampleNote}>
+              <Ionicons name="information-circle" size={20} color="#6366F1" />
+              <Text style={styles.exampleNoteText}>
+                Move only your eyes — keep your head and phone still during the test.
+              </Text>
             </View>
 
             <TouchableOpacity style={styles.startButton} onPress={gameStartState}>
@@ -668,28 +1036,65 @@ export default function VisualPursuit() {
             <TouchableOpacity onPress={handleBack} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color="#1F2937" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Visual Pursuit — Done</Text>
+            <Text style={styles.headerTitle}>Visual Pursuit — Results</Text>
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.resultScreen}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.resultCard}>
-              <Text style={styles.resultCardTitle}>Visual Pursuit — All 4 Rounds</Text>
-              {roundResults.apiSuccess ? (
-                <View style={styles.resultRow}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                  <Text style={styles.resultSuccess}>Analysis complete — data saved</Text>
-                </View>
-              ) : (
-                <View style={styles.resultRow}>
-                  <Ionicons name="cloud-offline-outline" size={20} color="#9CA3AF" />
-                  <Text style={styles.resultUnavailable}>API unavailable — video saved</Text>
-                </View>
-              )}
+          <ScrollView contentContainerStyle={styles.resultScreen} showsVerticalScrollIndicator={false}>
+            {/* Overall badge */}
+            <View style={[styles.resultCard, { alignItems: 'center', gap: 8 }]}>
+              <Ionicons
+                name={roundResults.apiSuccess ? "checkmark-circle" : "cloud-offline-outline"}
+                size={40}
+                color={roundResults.apiSuccess ? "#10B981" : "#9CA3AF"}
+              />
+              <Text style={styles.resultCardTitle}>
+                {roundResults.apiSuccess ? "Analysis Complete" : "Videos Saved — API Offline"}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#6B7280', textAlign: 'center' }}>
+                {roundResults.apiSuccess
+                  ? "Eye movement data processed successfully"
+                  : "All 4 videos uploaded. Analysis will be available when server is online."}
+              </Text>
             </View>
+
+            {/* Per-round results — pupil detection % + nystagmus scores only */}
+            {ROUND_ORDER.map(round => {
+              const r       = roundResults.rounds[round];
+              const label   = ROUND_LABELS[round];
+              const nyst    = (r as any)?.nystagmus;
+              const pupilPct = r?.totalFrames
+                ? Math.round((r.pupilDetected ?? 0) / r.totalFrames * 100)
+                : null;
+              return (
+                <View key={round} style={styles.resultCard}>
+                  <Text style={styles.resultCardTitle}>{label}</Text>
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+                    {/* Pupil detection */}
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>Pupil</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '700', color: '#6366F1' }}>
+                        {pupilPct !== null ? `${pupilPct}%` : '—'}
+                      </Text>
+                    </View>
+                    {/* Horizontal nystagmus */}
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>H-Nyst</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '700', color: '#8B5CF6' }}>
+                        {nyst?.xNystagmusScore != null ? nyst.xNystagmusScore.toFixed(2) : '—'}
+                      </Text>
+                    </View>
+                    {/* Vertical nystagmus */}
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 10, color: '#6B7280', marginBottom: 2 }}>V-Nyst</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '700', color: '#06B6D4' }}>
+                        {nyst?.yNystagmusScore != null ? nyst.yNystagmusScore.toFixed(2) : '—'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
 
             <TouchableOpacity style={styles.retryButton} onPress={gameStartState}>
               <Ionicons name="refresh" size={20} color="#FFFFFF" />

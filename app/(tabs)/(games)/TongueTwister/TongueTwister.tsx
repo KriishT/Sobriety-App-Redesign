@@ -11,9 +11,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, ms, vs } from '@/lib/scale';
+
+const SCREEN_W = Dimensions.get('window').width;
+const TT_INSTR = require('@/assets/inst_images/TT_instr.png');
 
 const TONGUE_TWISTERS = [
   "She sells seashells by the seashore",
@@ -460,92 +463,46 @@ console.log('✅ FormData created');
             <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color="#1F2937" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Tongue Twisters</Text>
+            <Text style={styles.headerTitle}>Tongue Twister</Text>
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Logo */}
             <View style={styles.iconContainer}>
               <Ionicons name="mic-outline" size={64} color="#F59E0B" />
             </View>
 
             <Text style={styles.instructionTitle}>Tongue Twister Test</Text>
-            
             <Text style={styles.instructionText}>
-              Read the tongue twisters aloud as clearly as you can. We'll analyze your speech for clarity and articulation.
+              Tests your speech clarity and articulation speed to assess your current mental sharpness.
             </Text>
 
-            {/* Example Section */}
+            {/* How it works */}
             <View style={styles.exampleBox}>
               <Text style={styles.exampleLabel}>How it works:</Text>
-
-              <View style={styles.stepContainer}>
-                <View style={styles.step}>
+              {[
+                'Read the tongue twister aloud into the microphone.',
+                'Read as many phrases as possible within the 30-second time limit.',
+              ].map((text, i) => (
+                <View key={i} style={styles.step}>
                   <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>1</Text>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
                   </View>
-                  <Text style={styles.stepText}>A tongue twister will appear on screen</Text>
+                  <Text style={styles.stepText}>{text}</Text>
                 </View>
-
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>2</Text>
-                  </View>
-                  <Text style={styles.stepText}>Read it aloud clearly into the microphone</Text>
-                </View>
-
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>3</Text>
-                  </View>
-                  <Text style={styles.stepText}>Press "NEXT" to move to the next phrase</Text>
-                </View>
-
-                <View style={styles.step}>
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>4</Text>
-                  </View>
-                  <Text style={styles.stepText}>Continue for 30 seconds</Text>
-                </View>
-              </View>
-
-              <View style={styles.examplePhrase}>
-                <Ionicons name="chatbox-outline" size={24} color="#F59E0B" />
-                <Text style={styles.examplePhraseText}>
-                  "She sells seashells by the seashore"
-                </Text>
-              </View>
-
-              <View style={styles.exampleNote}>
-                <Ionicons name="information-circle" size={20} color="#F59E0B" />
-                <Text style={styles.exampleNoteText}>
-                  Speak clearly and at a normal pace
-                </Text>
-              </View>
+              ))}
             </View>
 
-            {/* Rules */}
-            <View style={styles.rulesBox}>
-              <Text style={styles.rulesTitle}>Test Rules:</Text>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>30 seconds total duration</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Read as many phrases as possible</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Press NEXT after each phrase</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Clarity and speed both count</Text>
-              </View>
+            {/* Step illustration */}
+            <Image source={TT_INSTR} style={styles.ttInstImg} resizeMode="contain" />
+
+            {/* Tip */}
+            <View style={styles.ttTipsBox}>
+              <Ionicons name="information-circle" size={20} color="#F59E0B" style={{ marginBottom: 6 }} />
+              <Text style={styles.ttTipText}>
+                Ensure you are in a quiet environment for optimal voice analysis.
+              </Text>
             </View>
 
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
@@ -1170,6 +1127,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#F59E0B',
+  },
+
+  ttInstImg: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 1.3,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  ttTipsBox: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  ttTipText: {
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 20,
   },
 });
 

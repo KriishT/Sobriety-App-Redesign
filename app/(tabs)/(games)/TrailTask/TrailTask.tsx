@@ -7,13 +7,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, ms, vs } from '@/lib/scale';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 const CANVAS_WIDTH = width - 40;
+const TRT_INSTR = require('@/assets/inst_images/TRT_instr.jpg');
 const CANVAS_HEIGHT = 500;
 
 // Build sequence: random start letter (not A), 7-8 letters, no Z wrap.
@@ -93,41 +94,43 @@ export default function TrailMaking() {
     router.replace('/(tabs)/dashboard');
   };
 
-  // Generate random positions for circles
+  // Grid-based placement — divides the canvas into cells and places one circle
+  // per cell with random jitter. Guarantees no overlapping regardless of circle count.
   const generateCircles = (sequence: string[]): CircleItem[] => {
-    const newCircles: CircleItem[] = [];
-    const minDistance = 70;
-    const margin = 50;
+    const n = sequence.length;
+    const RADIUS = 30;
+    const PAD = 20; // extra clearance between circles
 
-    sequence.forEach((label, index) => {
-      let x: number, y: number;
-      let attempts = 0;
-      
-      do {
-        x = Math.random() * (CANVAS_WIDTH - 2 * margin) + margin;
-        y = Math.random() * (CANVAS_HEIGHT - 2 * margin) + margin;
-        attempts++;
-        
-        const tooClose = newCircles.some(circle => {
-          const distance = Math.sqrt(
-            Math.pow(circle.x - x, 2) + Math.pow(circle.y - y, 2)
-          );
-          return distance < minDistance;
-        });
-        
-        if (!tooClose || attempts >= 100) break;
-      } while (true);
-      
-      newCircles.push({
+    // Find a grid that fits n circles with enough cells
+    const cols = Math.ceil(Math.sqrt(n * 1.6));
+    const rows = Math.ceil(n / cols);
+    const cellW = (CANVAS_WIDTH  - PAD) / cols;
+    const cellH = (CANVAS_HEIGHT - PAD) / rows;
+    const maxJitterX = Math.max(0, cellW / 2 - RADIUS - PAD);
+    const maxJitterY = Math.max(0, cellH / 2 - RADIUS - PAD);
+
+    // Build & shuffle grid cells so label order ≠ visual order
+    const cells = Array.from({ length: cols * rows }, (_, i) => ({
+      c: i % cols,
+      r: Math.floor(i / cols),
+    }));
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+
+    return sequence.map((label, index) => {
+      const { c, r } = cells[index];
+      const cx = PAD / 2 + c * cellW + cellW / 2 + (Math.random() - 0.5) * 2 * maxJitterX;
+      const cy = PAD / 2 + r * cellH + cellH / 2 + (Math.random() - 0.5) * 2 * maxJitterY;
+      return {
         id: `circle-${index}`,
         label,
-        x,
-        y,
+        x: Math.max(RADIUS + 4, Math.min(CANVAS_WIDTH  - RADIUS - 4, cx)),
+        y: Math.max(RADIUS + 4, Math.min(CANVAS_HEIGHT - RADIUS - 4, cy)),
         sequenceIndex: index,
-      });
+      };
     });
-    
-    return newCircles;
   };
 
   const handleCirclePress = (circle: CircleItem) => {
@@ -220,43 +223,40 @@ export default function TrailMaking() {
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Logo */}
             <View style={styles.iconContainer}>
               <Ionicons name="git-branch-outline" size={64} color="#F59E0B" />
             </View>
 
-            <Text style={styles.instructionTitle}>Trail Making Task</Text>
-            
+            <Text style={styles.instructionTitle}>Trail Making Test</Text>
             <Text style={styles.instructionText}>
-              Connect the circles in order by drawing a continuous line. Do not lift your finger!
+              Measures visual tracking and task-switching abilities to assess your overall cognitive agility.
             </Text>
 
-            {/* Rules */}
-            <View style={styles.rulesBox}>
-              <Text style={styles.rulesTitle}>Test Rules:</Text>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Alternate between letters and numbers starting from 1 (e.g. F→1→G→2→H→3)</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Only the starting letter is shown — figure out the rest!</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Do not cross an out-of-sequence letter or number in an attempt to get to the next correct symbol</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>⚠️ Keep finger down — lifting your finger ends the test</Text>
-              </View>
-              <View style={styles.rule}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.ruleText}>Complete as fast as possible for best results</Text>
-              </View>
+            {/* How it works */}
+            <View style={styles.exampleBox}>
+              <Text style={styles.exampleLabel}>How it works:</Text>
+              {[
+                'Find the starting point to begin the test.',
+                'Connect the letters and numbers in alternating order (e.g., F→1→G→2).',
+              ].map((text, i) => (
+                <View key={i} style={styles.trtStep}>
+                  <View style={styles.trtStepNum}>
+                    <Text style={styles.trtStepNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.trtStepText}>{text}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Step illustration */}
+            <Image source={TRT_INSTR} style={styles.trtInstImg} resizeMode="contain" />
+
+            {/* Tip */}
+            <View style={styles.trtTipBox}>
+              <Ionicons name="time-outline" size={20} color="#F59E0B" style={{ marginBottom: 6 }} />
+              <Text style={styles.trtTipText}>Speed & Accuracy determine your score.</Text>
             </View>
 
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
@@ -820,6 +820,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#F59E0B',
+  },
+
+  trtStep:        { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  trtStepNum:     { width: 30, height: 30, borderRadius: 15, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  trtStepNumText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  trtStepText:    { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
+  trtInstImg: {
+    width: '100%',
+    alignSelf: 'center',
+    height: undefined,
+    aspectRatio: 0.45,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  trtTipBox: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    alignItems: 'center',
+  },
+  trtTipText: {
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 20,
+    fontWeight: '600',
   },
 });
 

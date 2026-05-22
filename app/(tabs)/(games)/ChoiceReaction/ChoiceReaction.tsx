@@ -7,9 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { scale, ms, vs } from '@/lib/scale';
+import { scale, ms } from '@/lib/scale';
+
+const SCREEN_W = Dimensions.get('window').width;
+const CR_INSTR = require('@/assets/inst_images/CR_instr.jpg');
 
 type Square = { id: number; color: string };
 type Phase = 'intro' | 'game' | 'results';
@@ -226,73 +229,45 @@ export default function ChoiceReaction() {
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Logo */}
             <View style={styles.iconContainer}>
               <Ionicons name="finger-print-outline" size={64} color="#10B981" />
             </View>
-            <Text style={styles.instructionTitle}>Choice Reaction Game</Text>
+
+            <Text style={styles.instructionTitle}>Choice Reaction Test</Text>
             <Text style={styles.instructionText}>
-              When one of the squares turns blue, press and hold it. When it turns red, release immediately.
+              Evaluates reaction speed, decision-making, and time perception to assess your cognitive focus.
             </Text>
 
-            {/* Visual example */}
+            {/* How it works */}
             <View style={styles.exampleBox}>
               <Text style={styles.exampleLabel}>How it works:</Text>
-
-              <Text style={styles.stepTitle}>1. Wait for a square to turn blue</Text>
-              <View style={styles.gridContainer}>
-                <View style={styles.gridRow}>
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
+              {[
+                'Follow the color cues: Hold for blue, release for red.',
+                'Stop the test when you estimate 30 seconds have passed.',
+              ].map((text, i) => (
+                <View key={i} style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{text}</Text>
                 </View>
-                <View style={styles.gridRow}>
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                </View>
-              </View>
-
-              <Text style={styles.stepTitle}>2. Press and HOLD the blue square</Text>
-              <View style={styles.gridContainer}>
-                <View style={styles.gridRow}>
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                  <View style={[styles.square, { backgroundColor: '#3B82F6' }]} />
-                </View>
-                <View style={styles.gridRow}>
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                </View>
-              </View>
-
-              <Text style={styles.stepTitle}>3. When it turns red, RELEASE immediately</Text>
-              <View style={styles.gridContainer}>
-                <View style={styles.gridRow}>
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                  <View style={[styles.square, { backgroundColor: '#EF4444' }]} />
-                </View>
-                <View style={styles.gridRow}>
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                  <View style={[styles.square, { backgroundColor: '#000000' }]} />
-                </View>
-              </View>
-
-              <View style={styles.exampleNote}>
-                <Ionicons name="information-circle" size={20} color="#10B981" />
-                <Text style={styles.exampleNoteText}>
-                  <Text style={styles.boldText}>Blue</Text> = Press & Hold {'  •  '} <Text style={styles.boldText}>Red</Text> = Release
-                </Text>
-              </View>
+              ))}
             </View>
 
-            {/* Rules */}
-            <View style={styles.rulesBox}>
-              <Text style={styles.rulesTitle}>Test Rules:</Text>
+            {/* Step illustration */}
+            <Image source={CR_INSTR} style={styles.crInstImg} resizeMode="contain" />
+
+            {/* Tips */}
+            <View style={styles.tipsBox}>
+              <Ionicons name="information-circle" size={20} color="#10B981" style={{ marginBottom: 8 }} />
               {[
-                'Tap STOP when you feel 30 seconds have passed — no visible timer',
-                'We measure your reaction time for both press and release',
-                'Pressing wrong squares counts as errors',
-              ].map((r, i) => (
-                <View key={i} style={styles.rule}>
-                  <View style={styles.bulletPoint} />
-                  <Text style={styles.ruleText}>{r}</Text>
+                'Press & release accuracy matters.',
+                'Wrong taps count as errors.',
+              ].map((tip, i) => (
+                <View key={i} style={styles.tipRow}>
+                  <View style={styles.tipBullet} />
+                  <Text style={styles.tipText}>{tip}</Text>
                 </View>
               ))}
             </View>
@@ -495,6 +470,45 @@ const styles = StyleSheet.create({
   retryButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF', marginLeft: 8 },
   homeButton:      { paddingVertical: 12 },
   homeButtonText:  { fontSize: 16, fontWeight: '600', color: '#10B981' },
+
+  step:           { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  stepNumber:     { width: 30, height: 30, borderRadius: 15, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  stepNumberText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  stepText:       { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
+
+  crInstImg: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 1.25,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  tipsBox: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  tipBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+    marginTop: 7,
+    marginRight: 10,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#065F46',
+    lineHeight: 20,
+  },
 });
 
 

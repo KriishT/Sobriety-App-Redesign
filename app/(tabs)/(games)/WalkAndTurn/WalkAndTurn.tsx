@@ -14,6 +14,8 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Dimensions,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -21,6 +23,9 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const SCREEN_W = Dimensions.get('window').width;
+const WAT_INST = require('@/assets/inst_images/WAT_inst.jpg');
 
 type TestPhase = "walk-forward" | "turn" | "walk-back" | "finished";
 
@@ -252,78 +257,60 @@ export default function WalkAndTurn() {
       {!gameStart && !gameCompleted && (
         <>
           <View style={styles.header}>
-            <TouchableOpacity
-              onPress={handleBackToDashboard}
-              style={styles.backButton}
-            >
+            <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color="#1F2937" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Walk and Turn</Text>
+            <Text style={styles.headerTitle}>Walk and Turn Test</Text>
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Logo */}
             <View style={styles.iconContainer}>
               <Ionicons name="walk-outline" size={64} color="#3B82F6" />
             </View>
 
             <Text style={styles.instructionTitle}>Walk and Turn Test</Text>
-
             <Text style={styles.instructionText}>
-              Follow the audio instructions carefully. This test measures your
-              balance and coordination while walking.
+              Evaluates gait stability and physical coordination to assess your basic motor skills.
             </Text>
 
-            {/* Steps */}
+            {/* How it works */}
             <View style={styles.exampleBox}>
-              <Text style={styles.exampleLabel}>Test Steps:</Text>
-
-              <View style={styles.stepContainer}>
-                {[
-                  "Walk straight for 5 steps, then tap Done",
-                  "Turn around, then tap Done",
-                  "Walk 5 steps back to start, then tap Done",
-                ].map((text, i) => (
-                  <View key={i} style={styles.step}>
-                    <View style={styles.stepNumber}>
-                      <Text style={styles.stepNumberText}>{i + 1}</Text>
-                    </View>
-                    <Text style={styles.stepText}>{text}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.exampleNote}>
-                <Ionicons name="information-circle" size={20} color="#3B82F6" />
-                <Text style={styles.exampleNoteText}>
-                  Hold the phone in your hand throughout
-                </Text>
-              </View>
-            </View>
-
-            {/* Rules */}
-            <View style={styles.rulesBox}>
-              <Text style={styles.rulesTitle}>Important:</Text>
+              <Text style={styles.exampleLabel}>How it works:</Text>
               {[
-                "Hold the phone in your hand — do not put it in your pocket",
-                "Listen to audio cues for each step",
-                "Walk in a straight line",
-                "Tap Done after completing each step",
-              ].map((rule, i) => (
-                <View key={i} style={styles.rule}>
-                  <View style={styles.bulletPoint} />
-                  <Text style={styles.ruleText}>{rule}</Text>
+                "Walk 5 steps straight at a steady pace.",
+                "Turn around and walk back to the starting point.",
+              ].map((text, i) => (
+                <View key={i} style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{text}</Text>
                 </View>
               ))}
             </View>
 
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={() => setCountdown(true)}
-            >
+            {/* Step illustration */}
+            <Image source={WAT_INST} style={styles.watInstImg} resizeMode="contain" />
+
+            {/* Tips */}
+            <View style={styles.tipsBox}>
+              <Ionicons name="information-circle" size={20} color="#3B82F6" style={{ marginBottom: 8 }} />
+              {[
+                "Always begin with your right foot.",
+                "Listen for audio cues for each step.",
+                "Stay on a straight line.",
+                'Tap "Done" after each completed stage.',
+              ].map((tip, i) => (
+                <View key={i} style={styles.tipRow}>
+                  <View style={styles.tipBullet} />
+                  <Text style={styles.tipText}>{tip}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
               <Text style={styles.startButtonText}>Begin Test</Text>
               <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
             </TouchableOpacity>
@@ -887,6 +874,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#3B82F6",
+  },
+
+  watInstImg: {
+    width: SCREEN_W,
+    marginHorizontal: -20,
+    height: undefined,
+    aspectRatio: 0.75,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  tipsBox: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  tipBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3B82F6',
+    marginTop: 7,
+    marginRight: 10,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E40AF',
+    lineHeight: 20,
   },
 });
 

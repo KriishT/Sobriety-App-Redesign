@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, View } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { onAuthChanged } from '@/lib/auth';
-import { SessionProvider } from '@/lib/SessionContext';
+import { SessionProvider, useSession } from '@/lib/SessionContext';
 import { ParticipantProvider, useParticipant } from '@/lib/ParticipantContext';
 import type { User } from 'firebase/auth';
 
@@ -12,26 +12,28 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const { config, loading: configLoading } = useParticipant();
+  const { savePartialSession, sessionMode } = useSession();
 
   useEffect(() => {
     const unsub = onAuthChanged((u) => setUser(u));
     return unsub;
   }, []);
 
-  // Intercept the Android hardware back button inside game screens so it always
-  // returns to the dashboard instead of going back through the navigation history
-  // (which could land on a previously-visited game).
+  // Intercept the Android hardware back button inside game screens.
+  // Always saves the partial session first so no in-progress data is lost,
+  // then navigates to dashboard instead of going back through the history stack.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const path = segments.join('/');
       if (path.includes('(games)')) {
+        if (sessionMode === 'full_session') savePartialSession();
         router.replace('/(tabs)/dashboard');
-        return true; // consumed — prevent OS default back
+        return true;
       }
-      return false; // let OS handle it for non-game screens
+      return false;
     });
     return () => sub.remove();
-  }, [segments, router]);
+  }, [segments, router, sessionMode, savePartialSession]);
 
   useEffect(() => {
     if (user === undefined || configLoading) return;
