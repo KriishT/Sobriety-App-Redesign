@@ -11,9 +11,10 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useRef, useState } from "react";
 import { GameTimer } from "@/components/GameTimer";
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const SCREEN_W = Dimensions.get('window').width;
 const SN_INSTR = require('@/assets/inst_images/SN_instr.jpg');
 
 export default function StroopNaming() {
@@ -552,9 +553,8 @@ const styles = StyleSheet.create({
   snStepNumText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
   snStepText:    { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
   snInstImg: {
-    width: '120%',
-    alignSelf: 'center',
-    marginHorizontal: '-10%',
+    width: SCREEN_W,
+    marginHorizontal: -20,
     height: undefined,
     aspectRatio: 1.6,
     borderRadius: 8,
