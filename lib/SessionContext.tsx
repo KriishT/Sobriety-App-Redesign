@@ -52,6 +52,11 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+export interface SurveyData {
+  drinkCount: number;
+  breathalyzerScore: string | null;
+}
+
 interface SessionContextType {
   sessionMode: 'individual' | 'full_session';
   setSessionMode: (mode: 'individual' | 'full_session') => void;
@@ -62,7 +67,8 @@ interface SessionContextType {
   currentGameIndex: number;
   sessionId: string | null;
   partialSessionId: string | null;
-  startSession: () => void;
+  surveyData: SurveyData | null;
+  startSession: (survey?: SurveyData) => void;
   resumeSession: (partial: import('./firestore').PartialSessionDoc) => void;
   completeGame: (gameType: string, metrics: any, startTime?: Date) => void;
   updateGameResult: (gameType: string, updates: Record<string, any>) => void;
@@ -109,6 +115,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // even when called immediately after setPartialSessionId (before React re-renders).
   const partialSessionIdRef = useRef<string | null>(null);
 
+  const [surveyData, setSurveyData] = useState<SurveyData | null>(null);
+  const surveyDataRef = useRef<SurveyData | null>(null);
+
   // ── helpers ──────────────────────────────────────────────────────────────────
 
   const setSessionMode = (mode: 'individual' | 'full_session') => {
@@ -123,7 +132,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // ── core session actions ──────────────────────────────────────────────────────
 
-  const startSession = () => {
+  const startSession = (survey?: SurveyData) => {
     const queue = shuffleArray(ALL_GAMES);
     const now = new Date();
     sessionModeRef.current = 'full_session';
@@ -141,6 +150,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setSessionId(`session_${Date.now()}`);
     partialSessionIdRef.current = null;
     setPartialSessionId(null);
+    surveyDataRef.current = survey ?? null;
+    setSurveyData(survey ?? null);
     pendingJobsRef.current = [];
   };
 
@@ -195,6 +206,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       'partial',
       queue,
       partialSessionIdRef.current ?? undefined,   // use ref — always current
+      surveyDataRef.current,
     ).then(id => {
       if (id) setPartialSessionIdSync(id);         // update ref + state together
     }).catch(e => console.log('[Session] Partial save error:', e));
@@ -285,6 +297,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setSessionId(null);
     partialSessionIdRef.current = null;
     setPartialSessionId(null);
+    surveyDataRef.current = null;
+    setSurveyData(null);
     pendingJobsRef.current = [];
   };
 
@@ -299,6 +313,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       currentGameIndex,
       sessionId,
       partialSessionId,
+      surveyData,
       startSession,
       resumeSession,
       completeGame,

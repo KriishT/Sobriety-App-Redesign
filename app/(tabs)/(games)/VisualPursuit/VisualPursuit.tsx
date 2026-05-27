@@ -26,7 +26,8 @@ const INST2 = require('@/assets/inst_images/vp_inst2.jpg');  // landscape steps 
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const BALL_SIZE = 36;
-const BALL_SPEED = 3;
+const BALL_SPEED = 5;
+const BALL_PAUSE_FRAMES = 15; // ~450ms pause at 30ms tick
 const API_BASE = "https://nonpreventable-uncoagulating-vergie.ngrok-free.dev";
 
 // PiP camera dimensions (fixed — never changes during recording)
@@ -56,10 +57,10 @@ const ROUND_LABELS: Record<RoundKey, string> = {
 };
 
 const ROUND_INSTRUCTION: Record<RoundKey, string> = {
-  vertical_left:    "Position your LEFT eye inside the oval",
-  vertical_right:   "Position your RIGHT eye inside the oval",
-  horizontal_left:  "Position your LEFT eye inside the oval",
-  horizontal_right: "Position your RIGHT eye inside the oval",
+  vertical_left:    "Fill the oval with your LEFT eye — hold still",
+  vertical_right:   "Fill the oval with your RIGHT eye — hold still",
+  horizontal_left:  "Fill the oval with your LEFT eye — hold still",
+  horizontal_right: "Fill the oval with your RIGHT eye — hold still",
 };
 
 const ROUND_DIRECTION: Record<RoundKey, string> = {
@@ -385,6 +386,7 @@ export default function VisualPursuit() {
   const ballXRef = useRef(0);
   const ballYRef = useRef(0);
   const ballStageRef = useRef<BallStage>("to-end");
+  const pauseFramesRef = useRef(0);
   // Per-round URIs — camera is always full-screen (no resize) so per-round
   // recording is now safe. File is copied to documentDirectory before upload
   // because fetch() cannot access the camera cache path on Android.
@@ -465,6 +467,7 @@ export default function VisualPursuit() {
     const vertical = isVerticalRound(round);
     const centerX = canvasWidthRef.current / 2 - BALL_SIZE / 2;
     ballStageRef.current = "to-end";
+    pauseFramesRef.current = 0;
 
     if (vertical) {
       // Starts at center Y, goes to top, returns to center
@@ -480,6 +483,11 @@ export default function VisualPursuit() {
     }
 
     animationRef.current = setInterval(() => {
+      if (pauseFramesRef.current > 0) {
+        pauseFramesRef.current--;
+        return;
+      }
+
       const cx = canvasWidthRef.current / 2 - BALL_SIZE / 2;
 
       if (vertical) {
@@ -488,7 +496,11 @@ export default function VisualPursuit() {
         if (ballStageRef.current === "to-end") {
           // Moving up to top
           ballYRef.current = Math.max(0, ballYRef.current - BALL_SPEED);
-          if (ballYRef.current <= 0) ballStageRef.current = "to-start";
+          if (ballYRef.current <= 0) {
+            // Pause at top (near camera) before returning
+            pauseFramesRef.current = BALL_PAUSE_FRAMES;
+            ballStageRef.current = "to-start";
+          }
         } else {
           // Returning to center
           ballYRef.current = Math.min(centerY, ballYRef.current + BALL_SPEED);
@@ -506,7 +518,11 @@ export default function VisualPursuit() {
         if (ballStageRef.current === "to-end") {
           // Moving down to bottom
           ballYRef.current = Math.min(maxY, ballYRef.current + BALL_SPEED);
-          if (ballYRef.current >= maxY) ballStageRef.current = "to-start";
+          if (ballYRef.current >= maxY) {
+            // Pause at bottom before returning
+            pauseFramesRef.current = BALL_PAUSE_FRAMES;
+            ballStageRef.current = "to-start";
+          }
         } else {
           // Returning to top
           ballYRef.current = Math.max(0, ballYRef.current - BALL_SPEED);
@@ -953,10 +969,9 @@ export default function VisualPursuit() {
               </View>
 
               {isHorizontalAlign ? (
+                // Oval only — no text overlapping it
                 <View style={styles.horizontalOvalSection}>
                   <View style={styles.eyeOvalHorizontal} />
-                  <Text style={styles.alignInstruction}>{ROUND_INSTRUCTION[currentRound]}</Text>
-                  <Text style={styles.alignSubtext}>Align near the front camera</Text>
                 </View>
               ) : (
                 <View style={styles.verticalOvalSection}>
@@ -965,9 +980,25 @@ export default function VisualPursuit() {
                 </View>
               )}
 
-              <View style={styles.alignBottom}>
-                <Text style={styles.roundLabel}>{ROUND_LABELS[currentRound]}</Text>
-                <Text style={styles.ballDirectionText}>{ROUND_DIRECTION[currentRound]}</Text>
+              {/* Horizontal: rotate the whole bottom panel so it reads correctly in landscape.
+                  Left eye: -90° (phone rotated CW). Right eye: +90° (phone flipped 180°). */}
+              <View style={[
+                styles.alignBottom,
+                currentRound === 'horizontal_left'  && styles.alignBottomLandscape,
+                currentRound === 'horizontal_right' && styles.alignBottomLandscapeRight,
+              ]}>
+                {isHorizontalAlign ? (
+                  <>
+                    <Text style={styles.alignInstruction}>{ROUND_INSTRUCTION[currentRound]}</Text>
+                    <Text style={styles.alignSubtext}>Align near the front camera</Text>
+                    <Text style={styles.roundLabel}>{ROUND_LABELS[currentRound]}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.roundLabel}>{ROUND_LABELS[currentRound]}</Text>
+                    <Text style={styles.ballDirectionText}>{ROUND_DIRECTION[currentRound]}</Text>
+                  </>
+                )}
                 <TouchableOpacity style={styles.okButton} onPress={onOKPressed}>
                   <Text style={styles.okButtonText}>OK — Start Round</Text>
                   <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
@@ -1273,7 +1304,7 @@ const styles = StyleSheet.create({
   testContent: {
     flex: 1,
     backgroundColor: '#FAFAFA',
-    padding: 16,
+    padding: 8,
   },
 
   // Alignment overlay — semi-transparent so live camera shows through as background
@@ -1312,19 +1343,29 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
 
-  // Vertical rounds: oval centered in remaining space
+  // Vertical rounds: oval in lower portion of screen
   verticalOvalSection: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-end",
     alignItems: "center",
+    paddingBottom: 60,
     gap: 18,
   },
 
-  // Horizontal rounds: oval near top (near front camera)
+  // Horizontal rounds: oval near top (near front camera), small gap before text panel
   horizontalOvalSection: {
     paddingTop: 28,
+    paddingBottom: 20,
     alignItems: "center",
-    gap: 14,
+  },
+
+  // Left eye: phone rotated CW → text rotated -90° to read correctly
+  alignBottomLandscape: {
+    transform: [{ rotate: '-90deg' }],
+  },
+  // Right eye: phone flipped 180° from left → text rotated +90° to read correctly
+  alignBottomLandscapeRight: {
+    transform: [{ rotate: '90deg' }],
   },
 
   alignInstruction: {
@@ -1392,7 +1433,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#6366F1",
     position: "relative",
-    marginBottom: 14,
+    marginBottom: 8,
     overflow: "hidden",
   },
   ball: {

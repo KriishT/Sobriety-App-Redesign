@@ -87,7 +87,7 @@ function jaccardDist(a: Set<string>, b: Set<string>): number {
 //   - direction sequence derived from those dots
 // ─────────────────────────────────────────────────────────────────────────────
 const SYMBOL_CHARS = [
-  '>', '✓', '✕', 'Z', 'L', 'U', '◇', '△', 'W', '/',
+  '>', '✓', '✕', 'Z', 'L', 'U', '◇', 'N', 'W', '/',
   'T', '+', '7', 'Λ', 'V', 'Π', 'Γ', '⊏', '<', '=',
 ];
 
@@ -100,7 +100,7 @@ const CANONICAL_SEQS: number[][][] = [
   [[0, 6, 8]],             // 4  L   shape
   [[0, 6, 8, 2]],          // 5  U   shape
   [[1, 5, 7, 3], [1, 3]],  // 6  ◇   diamond
-  [[6, 1, 8], [6, 8]],     // 7  △   full triangle: two sides + base
+  [[0, 6, 4, 2, 8]],        // 7  N   left side down + diagonal up-right + right side down
   [[0, 6, 1, 8, 2]],       // 8  W   shape TL→BL→TC→BR→TR
   [[6, 4, 2]],             // 9  /   slash
   [[0, 2], [1, 7]],        // 10 T   top bar + center drop
@@ -263,7 +263,7 @@ export default function DSST() {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
 
   // ── timer ──
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(60);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameStartTimeRef = useRef<Date | null>(null);
 
@@ -292,13 +292,13 @@ export default function DSST() {
     setSessionMap(map);
     setScore(0); scoreRef.current = 0;
     setTotalAttempts(0); attemptsRef.current = 0;
-    setTimeLeft(30);
+    setTimeLeft(60);
     clearDrawing();
     setCurrentDigit(Math.floor(Math.random() * 10));
     setPhase('playing');
     gameStartTimeRef.current = new Date();
 
-    let remaining = 30;
+    let remaining = 60;
     timerRef.current = setInterval(() => {
       remaining -= 1;
       setTimeLeft(remaining);
@@ -330,7 +330,7 @@ export default function DSST() {
     setPhase('intro');
     setScore(0);
     setTotalAttempts(0);
-    setTimeLeft(30);
+    setTimeLeft(60);
     clearDrawing();
   }, [clearDrawing, stopTimer]);
 
@@ -445,7 +445,7 @@ export default function DSST() {
             {[
               'Check the reference table to find the symbol for the displayed digit.',
               'Draw the symbol on the grid and tap Submit to continue.',
-              'Complete as many as possible within 30 seconds.',
+              'Complete as many as possible within 60 seconds.',
             ].map((text, i) => (
               <View key={i} style={s.howStep}>
                 <View style={s.howStepNum}>

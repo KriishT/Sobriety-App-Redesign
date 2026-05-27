@@ -64,6 +64,8 @@ export default function TrailMaking() {
   const [isFailed, setIsFailed] = useState(false);
   const [errorCount, setErrorCount] = useState(0);
   const errorCountRef = useRef(0);
+  const [wronglyTouched, setWronglyTouched] = useState<Set<number>>(new Set());
+  const wronglyTouchedRef = useRef<Set<number>>(new Set());
 
   // Finger tracking
   const [fingerDown, setFingerDown] = useState(false);
@@ -94,68 +96,78 @@ export default function TrailMaking() {
     router.replace('/(tabs)/dashboard');
   };
 
-  // Grid-based placement — divides the canvas into cells and places one circle
-  // per cell with random jitter. Guarantees no overlapping regardless of circle count.
+  // Random placement with collision rejection — each circle is placed at a truly
+  // random position, retried up to MAX_ATTEMPTS times if it overlaps any placed circle.
+  // Falls back to a grid slot only if all attempts fail (very rare).
   const generateCircles = (sequence: string[]): CircleItem[] => {
     const n = sequence.length;
-    const RADIUS = 30;
-    const PAD = 20; // extra clearance between circles
+    const RADIUS = 22;
+    const MIN_DIST = RADIUS * 2 + 14; // minimum center-to-center gap
+    const MAX_ATTEMPTS = 300;
+    const MARGIN = RADIUS + 8;
 
-    // Find a grid that fits n circles with enough cells
-    const cols = Math.ceil(Math.sqrt(n * 1.6));
-    const rows = Math.ceil(n / cols);
-    const cellW = (CANVAS_WIDTH  - PAD) / cols;
-    const cellH = (CANVAS_HEIGHT - PAD) / rows;
-    const maxJitterX = Math.max(0, cellW / 2 - RADIUS - PAD);
-    const maxJitterY = Math.max(0, cellH / 2 - RADIUS - PAD);
+    const placed: { x: number; y: number }[] = [];
 
-    // Build & shuffle grid cells so label order ≠ visual order
-    const cells = Array.from({ length: cols * rows }, (_, i) => ({
-      c: i % cols,
-      r: Math.floor(i / cols),
-    }));
-    for (let i = cells.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cells[i], cells[j]] = [cells[j], cells[i]];
-    }
+    const tooClose = (x: number, y: number) =>
+      placed.some(p => Math.hypot(p.x - x, p.y - y) < MIN_DIST);
 
     return sequence.map((label, index) => {
-      const { c, r } = cells[index];
-      const cx = PAD / 2 + c * cellW + cellW / 2 + (Math.random() - 0.5) * 2 * maxJitterX;
-      const cy = PAD / 2 + r * cellH + cellH / 2 + (Math.random() - 0.5) * 2 * maxJitterY;
-      return {
-        id: `circle-${index}`,
-        label,
-        x: Math.max(RADIUS + 4, Math.min(CANVAS_WIDTH  - RADIUS - 4, cx)),
-        y: Math.max(RADIUS + 4, Math.min(CANVAS_HEIGHT - RADIUS - 4, cy)),
-        sequenceIndex: index,
-      };
+      let x = 0, y = 0;
+      let found = false;
+
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const tx = MARGIN + Math.random() * (CANVAS_WIDTH  - MARGIN * 2);
+        const ty = MARGIN + Math.random() * (CANVAS_HEIGHT - MARGIN * 2);
+        if (!tooClose(tx, ty)) {
+          x = tx; y = ty; found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        // Grid fallback — used only when canvas is very crowded
+        const cols = Math.ceil(Math.sqrt(n));
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        x = MARGIN + col * ((CANVAS_WIDTH  - MARGIN * 2) / cols);
+        y = MARGIN + row * ((CANVAS_HEIGHT - MARGIN * 2) / Math.ceil(n / cols));
+      }
+
+      placed.push({ x, y });
+      return { id: `circle-${index}`, label, x, y, sequenceIndex: index };
     });
   };
 
   const handleCirclePress = (circle: CircleItem) => {
+    // Already yellowed (correct or wrong) — ignore entirely
+    if (wronglyTouchedRef.current.has(circle.sequenceIndex)) return;
+    if (circle.sequenceIndex < currentIndex) return;
+
     if (circle.sequenceIndex === currentIndex) {
-      // ✅ CORRECT
+      // ✅ CORRECT — connect line, then advance past any already-yellowed wrong bubbles
       if (currentIndex > 0) {
         const previousCircle = circles.find(c => c.sequenceIndex === currentIndex - 1);
         if (previousCircle) {
           setConnectedLines(prev => [...prev, { from: previousCircle, to: circle }]);
         }
       }
-
-      setCurrentIndex(currentIndex + 1);
-
-      // Check if completed ALL circles
-      if (currentIndex === circles.length - 1) {
+      let nextIndex = currentIndex + 1;
+      while (nextIndex < circles.length && wronglyTouchedRef.current.has(nextIndex)) {
+        nextIndex++; // skip over wrongly-touched bubbles — they're already yellow
+      }
+      setCurrentIndex(nextIndex);
+      if (nextIndex >= circles.length) {
         finishGame(Date.now(), false, circles.length, circles.length);
       }
-    } else if (circle.sequenceIndex > currentIndex) {
-      // ❌ WRONG - crossed an out-of-sequence circle
+    } else {
+      // ❌ WRONG — turn yellow, lock, count error silently. User sees no difference.
+      const updated = new Set(wronglyTouchedRef.current);
+      updated.add(circle.sequenceIndex);
+      wronglyTouchedRef.current = updated;
+      setWronglyTouched(new Set(updated));
       errorCountRef.current += 1;
       setErrorCount(errorCountRef.current);
-      finishGame(Date.now(), true, currentIndex, circles.length);
     }
-    // Ignore if already completed circle
   };
 
   const finishGame = (endMs: number, failed: boolean, progressIndex: number, totalCircles: number) => {
@@ -203,6 +215,7 @@ export default function TrailMaking() {
     setGameCompleted(false);
     setIsFailed(false);
     setErrorCount(0); errorCountRef.current = 0;
+    setWronglyTouched(new Set()); wronglyTouchedRef.current = new Set();
     setFingerDown(false);
     setFingerPath([]);
     setLastTouchedCircle(null);
@@ -257,6 +270,14 @@ export default function TrailMaking() {
             <View style={styles.trtTipBox}>
               <Ionicons name="time-outline" size={20} color="#F59E0B" style={{ marginBottom: 6 }} />
               <Text style={styles.trtTipText}>Speed & Accuracy determine your score.</Text>
+            </View>
+
+            {/* Warning */}
+            <View style={styles.trtWarningBox}>
+              <Ionicons name="warning-outline" size={18} color="#92400E" style={{ marginRight: 8, marginTop: 1 }} />
+              <Text style={styles.trtWarningText}>
+                The starting letter changes every play-through — look carefully before you begin.
+              </Text>
             </View>
 
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
@@ -316,7 +337,7 @@ export default function TrailMaking() {
                     Math.pow(circle.y - touch.locationY, 2)
                   );
                   
-                  if (distance <= 30) { // Circle radius
+                  if (distance <= 22) { // Circle radius
                     // Only process if this is a new circle touch
                     if (lastTouchedCircle !== circle.sequenceIndex) {
                       setLastTouchedCircle(circle.sequenceIndex);
@@ -355,15 +376,14 @@ export default function TrailMaking() {
 
                 {/* Draw circles - NO HIGHLIGHTING */}
                 {circles.map((circle) => {
-                  const isCompleted = circle.sequenceIndex < currentIndex;
-                  
+                  const isYellow = circle.sequenceIndex < currentIndex || wronglyTouched.has(circle.sequenceIndex);
                   return (
                     <SvgCircle
                       key={circle.id}
                       cx={circle.x}
                       cy={circle.y}
-                      r={30}
-                      fill={isCompleted ? '#EAB308' : '#FFFFFF'}
+                      r={22}
+                      fill={isYellow ? '#EAB308' : '#FFFFFF'}
                       stroke="#D1D5DB"
                       strokeWidth={2}
                     />
@@ -372,16 +392,15 @@ export default function TrailMaking() {
 
                 {/* Draw text */}
                 {circles.map((circle) => {
-                  const isCompleted = circle.sequenceIndex < currentIndex;
-                  
+                  const isYellow = circle.sequenceIndex < currentIndex || wronglyTouched.has(circle.sequenceIndex);
                   return (
                     <SvgText
                       key={`text-${circle.id}`}
                       x={circle.x}
-                      y={circle.y + 8}
-                      fontSize="20"
+                      y={circle.y + 6}
+                      fontSize="15"
                       fontWeight="700"
-                      fill={isCompleted ? '#FFFFFF' : '#1F2937'}
+                      fill={isYellow ? '#FFFFFF' : '#1F2937'}
                       textAnchor="middle"
                     >
                       {circle.label}
@@ -426,21 +445,23 @@ export default function TrailMaking() {
             </View>
 
             <Text style={styles.resultTitle}>
-              {!isFailed ? 'Perfect!' : 'Test Failed'}
+              {!isFailed
+                ? errorCount === 0 ? 'Perfect!' : 'Trail Complete'
+                : 'Test Failed'}
             </Text>
             <Text style={styles.resultSubtitle}>
-              {!isFailed 
-                ? 'You completed the trail without errors!' 
-                : isFailed && currentIndex < circles.length 
-                  ? 'You lifted your finger too early' 
-                  : 'You tapped the wrong circle'}
+              {!isFailed
+                ? errorCount === 0
+                  ? 'You completed the trail without any errors!'
+                  : `You completed the trail with ${errorCount} error${errorCount === 1 ? '' : 's'}.`
+                : 'You lifted your finger too early'}
             </Text>
 
             <View style={styles.scoreCard}>
               <Text style={styles.scoreLabel}>Completion Time</Text>
               <Text style={styles.scoreValue}>{completionTime}</Text>
               <Text style={styles.scoreSubtext}>seconds</Text>
-              
+
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
                   <Text style={styles.statItemLabel}>Status</Text>
@@ -449,6 +470,16 @@ export default function TrailMaking() {
                     { color: !isFailed ? '#F59E0B' : '#EF4444' }
                   ]}>
                     {!isFailed ? 'Pass' : 'Fail'}
+                  </Text>
+                </View>
+                <View style={styles.statItemDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statItemLabel}>Errors</Text>
+                  <Text style={[
+                    styles.statItemValue,
+                    { color: errorCount === 0 ? '#10B981' : '#EF4444' }
+                  ]}>
+                    {errorCount}
                   </Text>
                 </View>
                 <View style={styles.statItemDivider} />
@@ -848,6 +879,22 @@ const styles = StyleSheet.create({
     color: '#92400E',
     lineHeight: 20,
     fontWeight: '600',
+  },
+  trtWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  trtWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 20,
   },
 });
 

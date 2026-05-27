@@ -23,7 +23,7 @@ const games = [
 
 export default function Dashboard() {
   const router = useRouter();
-  const { sessionMode, setSessionMode, startSession, resumeSession } = useSession();
+  const { sessionMode, setSessionMode, resumeSession } = useSession();
   const { config } = useParticipant();
   const [partialSession, setPartialSession] = useState<PartialSessionDoc | null>(null);
 
@@ -50,8 +50,7 @@ export default function Dashboard() {
   };
 
   const handleStartFullSession = () => {
-    startSession();
-    router.replace('/session-start' as any);
+    router.replace('/session-survey' as any);
   };
 
   return (

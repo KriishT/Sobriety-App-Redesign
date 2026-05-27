@@ -40,11 +40,12 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fetchEmpaticaData = void 0;
-const admin = __importStar(require("firebase-admin"));
-const scheduler_1 = require("firebase-functions/v2/scheduler");
-const params_1 = require("firebase-functions/params");
+exports.fetchEmpaticaData = exports.refetchSession = void 0;
 const client_s3_1 = require("@aws-sdk/client-s3");
+const admin = __importStar(require("firebase-admin"));
+const params_1 = require("firebase-functions/params");
+const https_1 = require("firebase-functions/v2/https");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 const stream_1 = require("stream");
 admin.initializeApp();
 const db = admin.firestore();
@@ -57,7 +58,6 @@ const TEN_MIN_MS = 10 * 60 * 1000;
 const BUFFER_MS = 2 * 60 * 1000; // wait 2 min after upload before fetching
 const GIVE_UP_MS = 3 * 60 * 60 * 1000; // give up after 3 hours
 // ─── Metrics per game ─────────────────────────────────────────────────────────
-// Only these two games produce Empatica watch data worth fetching.
 const METRICS_BY_GAME = {
     single_leg_stand: ['pulse-rate', 'accelerometers-std', 'activity-intensity', 'body-position'],
     walk_and_turn: ['pulse-rate', 'accelerometers-std', 'step-counts', 'activity-intensity'],
@@ -151,7 +151,7 @@ async function fetchGameMetrics(s3, cfg, gameType, startIso, endIso) {
     const startMinMs = Math.floor(startMs / 60000) * 60000;
     const endMs = endIso
         ? new Date(endIso).getTime()
-        : startMinMs + 2 * 60000; // 2-minute window when no end time available
+        : startMinMs + 60000; // 1-minute window — only the minute the game was played
     const dateStr = new Date(startIso).toISOString().slice(0, 10);
     const metrics = METRICS_BY_GAME[gameType];
     if (!metrics)
@@ -159,7 +159,9 @@ async function fetchGameMetrics(s3, cfg, gameType, startIso, endIso) {
     const result = {};
     let hasData = false;
     for (const metric of metrics) {
-        const rows = await fetchMetric(s3, cfg, dateStr, metric, startMs, endMs);
+        // Use startMinMs (floor to minute) so rows timestamped at the start of the
+        // game's minute (e.g. 05:41:00 for a game starting at 05:41:54) are included.
+        const rows = await fetchMetric(s3, cfg, dateStr, metric, startMinMs, endMs);
         result[metric.replace(/-/g, '_')] = rows;
         if (rows.length > 0)
             hasData = true;
@@ -295,6 +297,67 @@ async function processSessionGames(s3, now) {
         console.log(`[Empatica/session] ${sessionDoc.id} — saved updates, session status: ${updates['empaticaSessionStatus']}`);
     }
 }
+// ─── Manual force-refetch (HTTP) ─────────────────────────────────────────────
+// POST /refetchSession  { sessionId: "..." }
+// Ignores the 3-hour give-up timer so old sessions can be retried after a
+// device-ID or config fix.
+exports.refetchSession = (0, https_1.onRequest)({ secrets: [awsKeyId, awsSecretKey], region: 'us-central1' }, async (req, res) => {
+    var _a;
+    if (req.method !== 'POST') {
+        res.status(405).send('POST only');
+        return;
+    }
+    const { sessionId } = req.body;
+    if (!sessionId) {
+        res.status(400).send('missing sessionId');
+        return;
+    }
+    const s3 = new client_s3_1.S3Client({
+        region: REGION,
+        credentials: { accessKeyId: awsKeyId.value(), secretAccessKey: awsSecretKey.value() },
+    });
+    const sessionDoc = await db.collection('sessions').doc(sessionId).get();
+    if (!sessionDoc.exists) {
+        res.status(404).send('session not found');
+        return;
+    }
+    const d = sessionDoc.data();
+    const gameTimes = ((_a = d.gameTimes) !== null && _a !== void 0 ? _a : {});
+    const cfg = {
+        orgId: d.empaticaOrgId,
+        siteId: d.empaticaSiteId,
+        participantId: d.empaticaParticipantId,
+        deviceId: d.empaticaDeviceId,
+        subjectId: d.empaticaSubjectId,
+    };
+    const updates = {};
+    const results = {};
+    for (const [gameType, startIso] of Object.entries(gameTimes)) {
+        if (!METRICS_BY_GAME[gameType])
+            continue;
+        try {
+            const data = await fetchGameMetrics(s3, cfg, gameType, startIso); // no endIso → uses game-minute + 1 min window
+            const hasData = Object.keys(data).length > 0;
+            updates[`games.${gameType}.empaticaStatus`] = hasData ? 'fetched' : 'unavailable';
+            if (hasData)
+                updates[`games.${gameType}.empaticaData`] = data;
+            results[gameType] = hasData ? `fetched (${Object.keys(data).map(k => `${k}:${data[k].length}rows`).join(', ')})` : 'no data';
+        }
+        catch (e) {
+            results[gameType] = `error: ${e}`;
+        }
+    }
+    const allDone = Object.keys(gameTimes)
+        .filter(gt => METRICS_BY_GAME[gt])
+        .every(gt => {
+        const s = updates[`games.${gt}.empaticaStatus`];
+        return s === 'fetched' || s === 'unavailable';
+    });
+    updates['empaticaSessionStatus'] = allDone ? 'fetched' : 'partial';
+    updates['empaticaFetchedAt'] = admin.firestore.FieldValue.serverTimestamp();
+    await sessionDoc.ref.update(updates);
+    res.json({ ok: true, sessionId, cfg, results });
+});
 // ─── Scheduled entry point ────────────────────────────────────────────────────
 exports.fetchEmpaticaData = (0, scheduler_1.onSchedule)({
     schedule: 'every 5 minutes',

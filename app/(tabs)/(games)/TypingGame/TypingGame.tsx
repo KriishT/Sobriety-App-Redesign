@@ -14,6 +14,8 @@ import {
   Dimensions,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -227,7 +229,11 @@ export default function TypingChallenge() {
       </View>
 
       {/* Game Area */}
-      <View style={styles.gameArea}>
+      <KeyboardAvoidingView
+        style={styles.gameArea}
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
         {/* START SCREEN */}
         {!gameStarted && !gameOver && (
           <ScrollView
@@ -280,75 +286,74 @@ export default function TypingChallenge() {
 
         {/* PLAY SCREEN */}
         {gameStarted && !gameOver && (
-          <ScrollView
-            contentContainerStyle={styles.playScreen}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Timer & Score */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <Ionicons name="time-outline" size={20} color="#4F46E5" />
-                <GameTimer time={60} onTimeUp={handleGameOver} />
+          <View style={styles.playScreen}>
+            {/* ── Top: stats + sentence ── */}
+            <View style={styles.playTop}>
+              {/* Timer & Score */}
+              <View style={styles.statsContainer}>
+                <View style={styles.statCard}>
+                  <Ionicons name="time-outline" size={20} color="#4F46E5" />
+                  <GameTimer time={60} onTimeUp={handleGameOver} />
+                </View>
+                <View style={styles.statCard}>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={20}
+                    color="#10B981"
+                  />
+                  <Text style={styles.statText}>{correctSentences}</Text>
+                </View>
               </View>
-              <View style={styles.statCard}>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={20}
-                  color="#10B981"
-                />
-                <Text style={styles.statText}>{correctSentences}</Text>
+
+              {/* Instruction reminder */}
+              <Text style={styles.reminderText}>Type the sentence below</Text>
+
+              {/* Current Sentence Display with Live Highlighting */}
+              <View style={styles.sentenceContainer}>
+                <View style={styles.sentenceTextContainer}>
+                  {renderSentenceWithHighlight()}
+                </View>
               </View>
             </View>
 
-            {/* Instruction reminder */}
-            <Text style={styles.reminderText}>Type the sentence below</Text>
+            {/* ── Bottom: input + submit — always visible above keyboard ── */}
+            <View style={styles.playBottom}>
+              <TextInput
+                ref={inputRef}
+                style={styles.input}
+                value={userInput}
+                onChangeText={(text) => {
+                  if (text.length < userInput.length) {
+                    setBackspaceCount(backspaceCount + 1);
+                  } else {
+                    setTotalKeystrokes(totalKeystrokes + 1);
+                  }
+                  setUserInput(text);
+                }}
+                onSubmitEditing={handleSubmit}
+                placeholder="Start typing..."
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                spellCheck={false}
+                importantForAutofill="no"
+                multiline
+              />
 
-            {/* Current Sentence Display with Live Highlighting */}
-            <View style={styles.sentenceContainer}>
-              <View style={styles.sentenceTextContainer}>
-                {renderSentenceWithHighlight()}
-              </View>
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  userInput.trim() === "" && styles.submitButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={userInput.trim() === ""}
+              >
+                <Text style={styles.submitButtonText}>Submit</Text>
+                <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
-
-            {/* Input Field */}
-            <TextInput
-              ref={inputRef}
-              style={styles.input}
-              value={userInput}
-              onChangeText={(text) => {
-                // Track backspace
-                if (text.length < userInput.length) {
-                  setBackspaceCount(backspaceCount + 1);
-                } else {
-                  // Track keystroke
-                  setTotalKeystrokes(totalKeystrokes + 1);
-                }
-                setUserInput(text);
-              }}
-              onSubmitEditing={handleSubmit}
-              placeholder="Start typing..."
-              placeholderTextColor="#9CA3AF"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-              importantForAutofill="no"
-              multiline
-            />
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                userInput.trim() === "" && styles.submitButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={userInput.trim() === ""}
-            >
-              <Text style={styles.submitButtonText}>Submit</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
         )}
 
         {/* RESULT SCREEN */}
@@ -469,7 +474,7 @@ export default function TypingChallenge() {
             </TouchableOpacity>
           </ScrollView>
         )}
-      </View>
+      </KeyboardAvoidingView>
       {countdown && (
         <Countdown onComplete={() => { setCountdown(false); startGame(); }} />
       )}
@@ -586,9 +591,15 @@ const styles = StyleSheet.create({
 
   // PLAY SCREEN
   playScreen: {
-    flexGrow: 1,
-    alignItems: "center",
+    flex: 1,
     padding: 20,
+    justifyContent: 'space-between',
+  },
+  playTop: {
+    alignItems: 'center',
+  },
+  playBottom: {
+    width: '100%',
   },
   statsContainer: {
     flexDirection: "row",
@@ -649,18 +660,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#1F2937",
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 12,
     minHeight: 80,
     textAlignVertical: "top",
   },
   submitButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#10B981",
     paddingVertical: 14,
-    paddingHorizontal: 28,
     borderRadius: 12,
-    marginBottom: 20,
+    width: "100%",
+    marginBottom: 8,
   },
   submitButtonDisabled: {
     backgroundColor: "#9CA3AF",

@@ -13,6 +13,7 @@ export async function saveSession(
   status: 'complete' | 'partial' = 'complete',
   gameQueue: string[] = [],
   existingDocId?: string,   // If set, updates the existing doc instead of creating a new one
+  surveyData?: { drinkCount: number; breathalyzerScore: string | null } | null,
 ): Promise<string | null> {
   try {
     const gamesOut: Record<string, any> = {};
@@ -51,6 +52,7 @@ export async function saveSession(
       empaticaParticipantId: EMPATICA_PARTICIPANT.participantId,
       empaticaDeviceId:      EMPATICA_PARTICIPANT.deviceId,
       empaticaSubjectId:     EMPATICA_PARTICIPANT.subjectId,
+      ...(surveyData != null ? { survey: surveyData } : {}),
     };
 
     if (existingDocId) {

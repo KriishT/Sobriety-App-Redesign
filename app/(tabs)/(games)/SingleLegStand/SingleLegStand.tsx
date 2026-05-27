@@ -11,18 +11,19 @@ import { useRouter } from 'expo-router';
 import { Gyroscope } from 'expo-sensors';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, ms, vs } from '@/lib/scale';
 
-const SCREEN_W = Dimensions.get('window').width;
 const SLS_INSTR = require('@/assets/inst_images/SLS_instr.jpg');
 
 export default function SingleLegStand() {
   const [countdown, setCountdown] = useState(false);
   const [gameStart, setGameStart] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
-  
+  const [phase, setPhase] = useState<1 | 2>(1); // 1 = right leg, 2 = left leg
+  const [showIntermission, setShowIntermission] = useState(false);
+
   // Game state
   const [gyroData, setGyroData] = useState({ x: 0, y: 0, z: 0 });
   const [gyroSum, setGyroSum] = useState({ x: 0, y: 0, z: 0 });
@@ -64,6 +65,8 @@ export default function SingleLegStand() {
     setGyroData({ x: 0, y: 0, z: 0 });
     setGyroSum({ x: 0, y: 0, z: 0 });
     setSampleCount(0);
+    setPhase(1);
+    setShowIntermission(false);
     setEmpaticaResult(null);
     setGameStart(true);
     setGameCompleted(false);
@@ -80,6 +83,17 @@ export default function SingleLegStand() {
       }));
       setSampleCount(prev => prev + 1);
     });
+  };
+
+  const handlePhaseSwitch = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowIntermission(true);
+  };
+
+  const handleStartPhaseTwo = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowIntermission(false);
+    setPhase(2);
   };
 
   const handleGameOver = () => {
@@ -180,8 +194,9 @@ export default function SingleLegStand() {
             <View style={styles.exampleBox}>
               <Text style={styles.exampleLabel}>How it works:</Text>
               {[
-                "Hold the phone in one hand with your arm extended straight out.",
-                "Stand on one leg and maintain balance for 10 seconds.",
+                "Hold the phone in one hand at your side.",
+                "Stand on your RIGHT leg for 10 seconds.",
+                "The app will signal you — then switch to your LEFT leg for 10 seconds.",
               ].map((text, i) => (
                 <View key={i} style={styles.step}>
                   <View style={styles.stepNumber}>
@@ -199,8 +214,9 @@ export default function SingleLegStand() {
             <View style={styles.tipsBox}>
               <Ionicons name="information-circle" size={20} color="#EC4899" style={{ marginBottom: 8 }} />
               {[
-                "Keep both arms straight out to your sides.",
-                "Hold the phone flat on your palm, screen up.",
+                "Extend your arms forward and slightly to the sides for balance.",
+                "Hold the phone in one hand at your side.",
+                "A vibration will signal you to switch legs.",
               ].map((tip, i) => (
                 <View key={i} style={styles.tipRow}>
                   <View style={styles.tipBullet} />
@@ -217,8 +233,37 @@ export default function SingleLegStand() {
         </>
       )}
 
+      {/* INTERMISSION SCREEN — between phase 1 and phase 2 */}
+      {gameStart && !gameCompleted && showIntermission && (
+        <>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color="#1F2937" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Single Leg Stand</Text>
+            <View style={styles.placeholder} />
+          </View>
+
+          <View style={styles.intermissionScreen}>
+            <View style={styles.intermissionIconWrap}>
+              <Ionicons name="checkmark-circle" size={72} color="#EC4899" />
+            </View>
+            <Text style={styles.intermissionTitle}>Right Leg Done!</Text>
+            <Text style={styles.intermissionSubtitle}>
+              Great job. When you're ready, switch to your{' '}
+              <Text style={{ fontWeight: '700', color: '#831843' }}>LEFT leg</Text>{' '}
+              and press the button below to begin the second phase.
+            </Text>
+            <TouchableOpacity style={styles.nextPhaseButton} onPress={handleStartPhaseTwo}>
+              <Text style={styles.nextPhaseButtonText}>Start Left Leg</Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
       {/* GAME SCREEN */}
-      {gameStart && !gameCompleted && (
+      {gameStart && !gameCompleted && !showIntermission && (
         <>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBackToDashboard} style={styles.backButton}>
@@ -229,16 +274,25 @@ export default function SingleLegStand() {
           </View>
 
           <View style={styles.gameScreen}>
-            {/* Timer */}
+            {/* Phase indicator */}
+            <Text style={styles.phaseLabel}>Phase {phase} of 2</Text>
+
+            {/* Timer — keyed on phase so it resets when leg switches */}
             <View style={styles.timerCard}>
               <Ionicons name="time-outline" size={48} color="#EC4899" />
-              <GameTimer time={10} onTimeUp={handleGameOver} />
+              <GameTimer
+                key={phase}
+                time={10}
+                onTimeUp={phase === 1 ? handlePhaseSwitch : handleGameOver}
+              />
             </View>
 
             {/* Instructions */}
             <View style={styles.gameInstructionCard}>
               <Text style={styles.gameInstruction}>
-                Stand on one leg and hold your balance!
+                {phase === 1
+                  ? 'Stand on your RIGHT leg and hold your balance!'
+                  : 'Now switch — stand on your LEFT leg!'}
               </Text>
             </View>
 
@@ -598,6 +652,60 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
+  intermissionScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  intermissionIconWrap: {
+    width: scale(120),
+    height: scale(120),
+    borderRadius: scale(60),
+    backgroundColor: '#FCE7F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  intermissionTitle: {
+    fontSize: ms(26),
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  intermissionSubtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 40,
+    paddingHorizontal: 8,
+  },
+  nextPhaseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EC4899',
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 14,
+    gap: 10,
+    width: '100%',
+  },
+  nextPhaseButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  phaseLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#EC4899',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+  },
   // GAME SCREEN
   gameScreen: {
     flex: 1,
@@ -797,12 +905,13 @@ const styles = StyleSheet.create({
   },
 
   slsInstImg: {
-    width: SCREEN_W,
-    marginHorizontal: -20,
+    width: '100%',
+    alignSelf: 'center',
     height: undefined,
-    aspectRatio: 0.75,
+    aspectRatio: 0.40,
     borderRadius: 8,
     marginBottom: 16,
+    marginHorizontal: -10,
   },
   tipsBox: {
     backgroundColor: '#FDF2F8',

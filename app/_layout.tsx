@@ -87,6 +87,7 @@ export default function RootLayout() {
             <Stack.Screen name="session-transition" />
             <Stack.Screen name="session-results" />
             <Stack.Screen name="session-start" />
+            <Stack.Screen name="session-survey" />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </Stack>
         </AuthGate>

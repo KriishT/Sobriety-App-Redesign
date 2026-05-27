@@ -21,17 +21,6 @@ const GAME_ICONS: Record<string, string> = {
 };
 
 const GAME_KEY_METRICS: Record<string, string[]> = {
-  visual_pursuit: [
-    'apiSuccess',
-    'rounds.vertical_left.pupilDetected',
-    'rounds.vertical_right.pupilDetected',
-    'rounds.horizontal_left.pupilDetected',
-    'rounds.horizontal_right.pupilDetected',
-    'videoUrls.vertical_left',
-    'videoUrls.vertical_right',
-    'videoUrls.horizontal_left',
-    'videoUrls.horizontal_right',
-  ],
   dsst: ['score', 'accuracy', 'totalAttempts'],
   tongue_twister: ['phrasesCompleted', 'avgJitter', 'avgSpeakingRate'],
   choice_reaction: ['avgPressReactionTimeMs', 'errors', 'totalRounds'],
@@ -41,6 +30,47 @@ const GAME_KEY_METRICS: Record<string, string[]> = {
   single_leg_stand: ['stabilityScore', 'sampleCount'],
   walk_and_turn: ['stabilityScore', 'totalSamples', 'forwardGyroAvg'],
 };
+
+const VP_ROUNDS = [
+  { key: 'vertical_left',   label: 'R1 — Vertical Left' },
+  { key: 'vertical_right',  label: 'R2 — Vertical Right' },
+  { key: 'horizontal_left', label: 'R3 — Horizontal Left' },
+  { key: 'horizontal_right',label: 'R4 — Horizontal Right' },
+];
+
+function VPMetrics({ metrics }: { metrics: any }) {
+  return (
+    <View style={styles.metricsContainer}>
+      {VP_ROUNDS.map(({ key, label }) => {
+        const r = metrics?.rounds?.[key];
+        const pupilPct = r?.totalFrames
+          ? Math.round((r.pupilDetected ?? 0) / r.totalFrames * 100)
+          : null;
+        const xNyst = r?.nystagmus?.xNystagmusScore ?? null;
+        const yNyst = r?.nystagmus?.yNystagmusScore ?? null;
+        return (
+          <View key={key} style={styles.vpRoundRow}>
+            <Text style={styles.vpRoundLabel}>{label}</Text>
+            <View style={styles.vpRoundValues}>
+              <Text style={styles.vpStat}>
+                <Text style={styles.vpStatLabel}>Pupil </Text>
+                <Text style={styles.metricValue}>{pupilPct !== null ? `${pupilPct}%` : '—'}</Text>
+              </Text>
+              <Text style={styles.vpStat}>
+                <Text style={styles.vpStatLabel}>H-Nyst </Text>
+                <Text style={styles.metricValue}>{xNyst !== null ? xNyst.toFixed(1) : '—'}</Text>
+              </Text>
+              <Text style={styles.vpStat}>
+                <Text style={styles.vpStatLabel}>V-Nyst </Text>
+                <Text style={styles.metricValue}>{yNyst !== null ? yNyst.toFixed(1) : '—'}</Text>
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 function getNestedValue(obj: any, path: string): any {
   return path.split('.').reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
@@ -139,17 +169,21 @@ export default function SessionResults() {
               </View>
 
               {metrics ? (
-                <View style={styles.metricsContainer}>
-                  {metricKeys.map((metricKey) => {
-                    const value = getNestedValue(metrics, metricKey);
-                    return (
-                      <View key={metricKey} style={styles.metricRow}>
-                        <Text style={styles.metricLabel}>{formatMetricKey(metricKey)}</Text>
-                        <Text style={styles.metricValue}>{formatMetricValue(value)}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
+                gameKey === 'visual_pursuit'
+                  ? <VPMetrics metrics={metrics} />
+                  : (
+                    <View style={styles.metricsContainer}>
+                      {metricKeys.map((metricKey) => {
+                        const value = getNestedValue(metrics, metricKey);
+                        return (
+                          <View key={metricKey} style={styles.metricRow}>
+                            <Text style={styles.metricLabel}>{formatMetricKey(metricKey)}</Text>
+                            <Text style={styles.metricValue}>{formatMetricValue(value)}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )
               ) : (
                 <Text style={styles.noDataText}>No data recorded</Text>
               )}
@@ -298,6 +332,12 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   saveStatusText: { fontSize: 13, fontWeight: '500', color: '#6B7280' },
+
+  vpRoundRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  vpRoundLabel: { fontSize: 12, fontWeight: '700', color: '#6366F1', marginBottom: 4 },
+  vpRoundValues: { flexDirection: 'row', gap: 12 },
+  vpStat: { fontSize: 12 },
+  vpStatLabel: { color: '#6B7280' },
 });
 
 

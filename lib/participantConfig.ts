@@ -22,9 +22,10 @@ export function parseParticipantConfig(
   if (parts.length < 4) return null;
   const [orgId, siteId, participantId] = parts;
   if (!orgId || !siteId || !participantId) return null;
-  const serial    = serialNumber.trim().toUpperCase(); // normalise — S3 keys are uppercase
-  const subjectId = parts.slice(1).join('-');          // '1-1-1'
-  const deviceId  = `${siteId}-${serial}`;             // '1-3YK671D258'
+  const serial       = serialNumber.trim().toUpperCase(); // normalise — S3 keys are uppercase
+  const subjectId    = parts.slice(1).join('-');          // '1-1-1', '1-1-2', etc.
+  const participantNum = parts[parts.length - 1];         // last segment: '1', '2', '3', etc.
+  const deviceId     = `${participantNum}-${serial}`;     // '1-3YK671D258', '2-3YK9T1L159', etc.
   return { fullId: fullId.trim(), serialNumber: serial, orgId, siteId, participantId, subjectId, deviceId };
 }
 
