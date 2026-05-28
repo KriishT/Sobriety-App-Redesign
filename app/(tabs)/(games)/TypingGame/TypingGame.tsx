@@ -9,7 +9,7 @@ import { getRandomSentence } from "@/logic/Sentences";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -195,21 +195,17 @@ export default function TypingChallenge() {
     return { text: "Needs Improvement", color: "#EF4444" };
   };
 
-  // Helper function to highlight typed characters
+  // Render sentence as a single Text so React Native handles word-wrapping
+  // naturally — typed portion is dark, remaining portion is gray.
   const renderSentenceWithHighlight = () => {
-    return currentSentence.split("").map((char, index) => {
-      let color = "#6B7280"; // Default gray
-
-      if (index < userInput.length) {
-        color = "#1F2937";
-      }
-
-      return (
-        <Text key={index} style={{ color, fontSize: 20, fontWeight: "600" }}>
-          {char}
-        </Text>
-      );
-    });
+    const typed = currentSentence.slice(0, userInput.length);
+    const remaining = currentSentence.slice(userInput.length);
+    return (
+      <Text style={styles.sentenceText}>
+        <Text style={styles.sentenceTyped}>{typed}</Text>
+        <Text style={styles.sentenceRemaining}>{remaining}</Text>
+      </Text>
+    );
   };
 
   return (
@@ -319,9 +315,7 @@ export default function TypingChallenge() {
 
               {/* Current Sentence Display with Live Highlighting */}
               <View style={styles.sentenceContainer}>
-                <View style={styles.sentenceTextContainer}>
-                  {renderSentenceWithHighlight()}
-                </View>
+                {renderSentenceWithHighlight()}
               </View>
             </View>
 
@@ -602,19 +596,22 @@ const styles = StyleSheet.create({
   playScreen: {
     flex: 1,
     padding: 20,
-    justifyContent: 'space-between',
+    paddingBottom: 12,
   },
   playTop: {
+    flex: 1,
+    minHeight: 0,
     alignItems: 'center',
   },
   playBottom: {
+    flexShrink: 0,     // never compress — Submit is always fully visible
     width: '100%',
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 12,
   },
   statCard: {
     flexDirection: "row",
@@ -635,14 +632,14 @@ const styles = StyleSheet.create({
   reminderText: {
     fontSize: 14,
     color: "#6B7280",
-    marginBottom: 20,
+    marginBottom: 10,
     fontStyle: "italic",
   },
   sentenceContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 10,
     borderWidth: 2,
     borderColor: "#E5E7EB",
     width: "100%",
@@ -655,9 +652,17 @@ const styles = StyleSheet.create({
     borderColor: "#EF4444",
     backgroundColor: "#FEE2E2",
   },
-  sentenceTextContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  sentenceText: {
+    fontSize: 19,
+    fontWeight: "600",
+    lineHeight: 28,
+    color: "#9CA3AF",
+  },
+  sentenceTyped: {
+    color: "#1F2937",
+  },
+  sentenceRemaining: {
+    color: "#9CA3AF",
   },
   input: {
     backgroundColor: "#FFFFFF",

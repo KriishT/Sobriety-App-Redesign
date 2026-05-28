@@ -28,7 +28,7 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const BALL_SIZE = 36;
 const BALL_SPEED = 5;
 const BALL_PAUSE_FRAMES = 15; // ~450ms pause at 30ms tick
-const API_BASE = "https://nonpreventable-uncoagulating-vergie.ngrok-free.dev";
+const API_BASE = "https://unsoaped-tomas-monarchically.ngrok-free.dev";
 
 // PiP camera dimensions (fixed — never changes during recording)
 const PIP_W = 88;
@@ -387,6 +387,7 @@ export default function VisualPursuit() {
   const ballYRef = useRef(0);
   const ballStageRef = useRef<BallStage>("to-end");
   const pauseFramesRef = useRef(0);
+  const ballCycleRef = useRef(0); // counts completed round-trips; game ends after 2
   // Per-round URIs — camera is always full-screen (no resize) so per-round
   // recording is now safe. File is copied to documentDirectory before upload
   // because fetch() cannot access the camera cache path on Android.
@@ -468,15 +469,14 @@ export default function VisualPursuit() {
     const centerX = canvasWidthRef.current / 2 - BALL_SIZE / 2;
     ballStageRef.current = "to-end";
     pauseFramesRef.current = 0;
+    ballCycleRef.current = 0; // reset — will complete after 2 full round-trips
 
     if (vertical) {
-      // Starts at center Y, goes to top, returns to center
       const centerY = canvasHeightRef.current / 2 - BALL_SIZE / 2;
       ballXRef.current = centerX;
       ballYRef.current = centerY;
       setBallPosition({ x: centerX, y: centerY });
     } else {
-      // Horizontal rounds: ball starts at top (y=0), goes to bottom, returns to top
       ballXRef.current = centerX;
       ballYRef.current = 0;
       setBallPosition({ x: centerX, y: 0 });
@@ -497,7 +497,6 @@ export default function VisualPursuit() {
           // Moving up to top
           ballYRef.current = Math.max(0, ballYRef.current - BALL_SPEED);
           if (ballYRef.current <= 0) {
-            // Pause at top (near camera) before returning
             pauseFramesRef.current = BALL_PAUSE_FRAMES;
             ballStageRef.current = "to-start";
           }
@@ -505,21 +504,26 @@ export default function VisualPursuit() {
           // Returning to center
           ballYRef.current = Math.min(centerY, ballYRef.current + BALL_SPEED);
           if (ballYRef.current >= centerY) {
-            stopAnimation();
-            onComplete();
-            return;
+            ballCycleRef.current += 1;
+            if (ballCycleRef.current >= 2) {
+              // Both sweeps done
+              stopAnimation();
+              onComplete();
+              return;
+            }
+            // Start second sweep — brief pause at center before going again
+            pauseFramesRef.current = BALL_PAUSE_FRAMES;
+            ballStageRef.current = "to-end";
           }
         }
         setBallPosition({ x: cx, y: ballYRef.current });
       } else {
-        // Horizontal rounds: full vertical range, top → bottom → top
         const maxY = canvasHeightRef.current - BALL_SIZE;
 
         if (ballStageRef.current === "to-end") {
           // Moving down to bottom
           ballYRef.current = Math.min(maxY, ballYRef.current + BALL_SPEED);
           if (ballYRef.current >= maxY) {
-            // Pause at bottom before returning
             pauseFramesRef.current = BALL_PAUSE_FRAMES;
             ballStageRef.current = "to-start";
           }
@@ -527,9 +531,16 @@ export default function VisualPursuit() {
           // Returning to top
           ballYRef.current = Math.max(0, ballYRef.current - BALL_SPEED);
           if (ballYRef.current <= 0) {
-            stopAnimation();
-            onComplete();
-            return;
+            ballCycleRef.current += 1;
+            if (ballCycleRef.current >= 2) {
+              // Both sweeps done
+              stopAnimation();
+              onComplete();
+              return;
+            }
+            // Start second sweep — brief pause at top before going again
+            pauseFramesRef.current = BALL_PAUSE_FRAMES;
+            ballStageRef.current = "to-end";
           }
         }
         setBallPosition({ x: cx, y: ballYRef.current });

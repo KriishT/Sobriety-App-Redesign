@@ -162,14 +162,6 @@ export default function StroopNaming() {
             {/* Step illustration */}
             <Image source={SN_INSTR} style={styles.snInstImg} resizeMode="contain" />
 
-            {/* Tip */}
-            <View style={styles.snTipBox}>
-              <Ionicons name="information-circle" size={20} color="#3B82F6" style={{ marginBottom: 6 }} />
-              <Text style={styles.snTipText}>
-                The test ends automatically after 30 seconds.
-              </Text>
-            </View>
-
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
               <Text style={styles.startButtonText}>Begin Test</Text>
               <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
@@ -553,12 +545,12 @@ const styles = StyleSheet.create({
   snStepNumText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
   snStepText:    { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
   snInstImg: {
-    width: SCREEN_W,
-    marginHorizontal: -20,
+    width: SCREEN_W - 115,
+    alignSelf: 'center',
     height: undefined,
-    aspectRatio: 1.6,
+    aspectRatio: 1.625,
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   snTipBox: {
     backgroundColor: '#EFF6FF',
