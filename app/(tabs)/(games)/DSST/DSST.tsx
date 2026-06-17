@@ -471,7 +471,7 @@ export default function DSST() {
               </View>
             ))}
           </View>
-
+          <DSSTDemo />
           {/* Tips */}
           <View style={s.rulesCard}>
             <Ionicons name="information-circle" size={20} color="#8B5CF6" style={{ marginBottom: 8 }} />
@@ -494,7 +494,7 @@ export default function DSST() {
         {countdown && (
           <Countdown onComplete={() => { setCountdown(false); startGame(); }} />
         )}
-        <DSSTDemo />
+       
       </SafeAreaView>
     );
   }
