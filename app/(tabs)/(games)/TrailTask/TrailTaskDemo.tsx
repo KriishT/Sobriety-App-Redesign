@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 
 const SCREEN_W = Dimensions.get('window').width;
-const DEMO_ANIMATION = require('@/assets/animation/choice_reaction_demo.json'); 
+const DEMO_ANIMATION = require('../../../../assets/animation/trail_making_demo.json'); 
 
-export function ChoiceReactionDemo() {
+export default function TrailTaskDemo() {
   const [isFullVideo, setIsFullVideo] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -63,6 +63,7 @@ export function ChoiceReactionDemo() {
 
   return (
     <>
+      {/* 悬浮窗独立存在，不再嵌套在图片容器中 */}
       <Animated.View 
         style={[
           styles.floatingBox,
@@ -78,7 +79,7 @@ export function ChoiceReactionDemo() {
           pointerEvents={isCollapsed ? 'none' : 'auto'}
         >
           <Pressable style={styles.floatingPressable} onPress={() => setIsFullVideo(true)}>
-            <LottieView source={DEMO_ANIMATION} style={styles.floatingLottie} progress={0.25} />
+            <LottieView source={DEMO_ANIMATION} style={styles.floatingLottie} progress={0.5} />
             <View style={styles.playButtonOverlay}>
               <Ionicons name="play-circle" size={40} color="rgba(255,255,255,0.8)" />
             </View>
@@ -117,8 +118,8 @@ export function ChoiceReactionDemo() {
 const styles = StyleSheet.create({
   floatingBox: {
     position: 'absolute',
-    bottom: 183, 
-    right: 20,
+    bottom: 150, // 改为距离屏幕底部固定位置
+    right: 20,  // 改为距离屏幕右侧固定位置
     height: SCREEN_W / 2.8,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    zIndex: 1000,
+    zIndex: 1000, // 确保浮在最上层
   },
   floatingPressable: { width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden' },
   floatingLottie: { width: '100%', height: '100%' },

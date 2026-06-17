@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChoiceReactionDemo } from './ChoiceReactionDemo';
 
@@ -266,8 +266,8 @@ export default function ChoiceReaction() {
             </View>
 
             {/* Step illustration */}
-            {/* <Image source={CR_INSTR} style={styles.crInstImg} resizeMode="contain" /> */}
-            <ChoiceReactionDemo style={{ marginBottom: 16 }} />
+            <Image source={CR_INSTR} style={styles.crInstImg} resizeMode="contain" />
+            <ChoiceReactionDemo />
 
             {/* Tips */}
             <View style={styles.tipsBox}>
