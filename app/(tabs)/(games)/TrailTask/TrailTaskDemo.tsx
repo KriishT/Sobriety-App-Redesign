@@ -10,8 +10,6 @@ export default function TrailTaskDemo() {
   const [isPlaying, setIsPlaying] = useState(false);
   const lottieRef = useRef<LottieView>(null);
 
-  // 等待状态切换完成、progress 受控属性变为 undefined 之后，再调用 play()，
-  // 避免和 progress 属性切换之间的时序竞争导致动画消失/卡死。
   useEffect(() => {
     if (hasStarted) {
       lottieRef.current?.play();
@@ -53,7 +51,7 @@ export default function TrailTaskDemo() {
           ref={lottieRef}
           source={DEMO_ANIMATION}
           style={styles.lottie}
-          progress={hasStarted ? undefined : 0.5}
+          progress={hasStarted ? undefined : 0.45}
           loop
           autoPlay={false}
         />
@@ -88,7 +86,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#10B981',
+    backgroundColor: '#F59E0B',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -3,7 +3,7 @@ import LottieView from 'lottie-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-// 指向 DSST 的动画资源路径
+
 const DEMO_ANIMATION = require('../../../../assets/animation/DSST_demo.json');
 
 export default function DSSTDemo() {
@@ -11,8 +11,6 @@ export default function DSSTDemo() {
   const [isPlaying, setIsPlaying] = useState(false);
   const lottieRef = useRef<LottieView>(null);
 
-  // 等待状态切换完成、progress 受控属性变为 undefined 之后，再调用 play()，
-  // 避免和 progress 属性切换之间的时序竞争导致动画消失/卡死。
   useEffect(() => {
     if (hasStarted) {
       lottieRef.current?.play();
@@ -89,7 +87,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#10B981',
+    backgroundColor: '#8B5CF6',
     alignItems: 'center',
     justifyContent: 'center',
   },
