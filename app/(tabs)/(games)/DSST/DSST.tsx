@@ -1,7 +1,7 @@
 ﻿import { Countdown } from '@/components/Countdown';
 import { ScoreTrendCard } from '@/components/ScoreTrendCard';
-import { saveGameResult } from '@/lib/firestore';
 import { EMPATICA_PARTICIPANT } from '@/lib/empaticaConfig';
+import { saveGameResult } from '@/lib/firestore';
 import { useSession } from '@/lib/SessionContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,9 +17,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { scale, ms, vs } from '@/lib/scale';
 import Svg, { Circle, Line } from 'react-native-svg';
-
+import DSSTDemo from './DSSTDemo';
 const { width } = Dimensions.get('window');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -495,6 +494,7 @@ export default function DSST() {
         {countdown && (
           <Countdown onComplete={() => { setCountdown(false); startGame(); }} />
         )}
+        <DSSTDemo />
       </SafeAreaView>
     );
   }
