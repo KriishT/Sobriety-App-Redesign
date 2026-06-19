@@ -372,7 +372,7 @@ export default function WalkAndTurn() {
             {testPhase !== "finished" && (
               <TouchableOpacity style={styles.doneButton} onPress={handleNextPhase}>
                 <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
-                <Text style={styles.doneButtonText}>Done — Next Step</Text>
+                <Text style={styles.doneButtonText}>{testPhase === 'walk-back' ? 'Done — Finish' : 'Done — Next Step'}</Text>
               </TouchableOpacity>
             )}
           </View>

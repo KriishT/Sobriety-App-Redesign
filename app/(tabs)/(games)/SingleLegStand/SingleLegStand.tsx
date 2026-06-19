@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const SLS_INSTR = require('@/assets/ins_images/single_leg_stand.png');
 export default function SingleLegStand() {
   const [countdown, setCountdown] = useState(false);
+  const [countdownPhaseTwo, setCountdownPhaseTwo] = useState(false);
   const [gameStart, setGameStart] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [phase, setPhase] = useState<1 | 2>(1); // 1 = right leg, 2 = left leg
@@ -92,8 +93,8 @@ export default function SingleLegStand() {
 
   const handleStartPhaseTwo = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShowIntermission(false);
-    setPhase(2);
+    // Show 3-2-1 countdown before starting left leg phase
+    setCountdownPhaseTwo(true);
   };
 
   const handleGameOver = () => {
@@ -166,6 +167,13 @@ export default function SingleLegStand() {
       <StatusBar style="dark" />
       {countdown && (
         <Countdown onComplete={() => { setCountdown(false); gameStartState(); }} />
+      )}
+      {countdownPhaseTwo && (
+        <Countdown onComplete={() => {
+          setCountdownPhaseTwo(false);
+          setShowIntermission(false);
+          setPhase(2);
+        }} />
       )}
 
       {/* INSTRUCTIONS SCREEN */}

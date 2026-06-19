@@ -89,7 +89,9 @@ export default function ChoiceReaction() {
       setCurrentPhase('blue');
       hasRespondedToBlueRef.current = false;
       blueStartTime.current = Date.now();
-      setSquares(prev => prev.map(sq => sq.id === randomSquare ? { ...sq, color: BLUE_COLOR } : sq));
+      // Reset ALL squares to black first, then set only the target to blue.
+      // This prevents red and blue appearing simultaneously between rounds.
+      setSquares(prev => prev.map(sq => ({ ...sq, color: sq.id === randomSquare ? BLUE_COLOR : '#000000' })));
 
       missedBlueTimeoutRef.current = setTimeout(() => {
         if (!gameActiveRef.current) return;

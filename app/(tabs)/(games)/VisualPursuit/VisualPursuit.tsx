@@ -518,26 +518,35 @@ export default function VisualPursuit() {
     }
   };
 
+  // Uses FileSystem.uploadAsync (native) instead of fetch() for the video payload.
+  // React Native's JS-bridge fetch() fails with "Network request failed" on large
+  // files (~47 MB horizontal videos); the native uploader handles any file size.
   const analyzeVideo = async (uri: string): Promise<any> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
-      const formData = new FormData();
-      formData.append("video", { uri, type: "video/mp4", name: "recording.mp4" } as any);
-      const res = await fetch(`${API_BASE}/predict/video?sample_rate=4&overlay=0`, {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) {
-        console.log("[VP] API error:", res.status);
+      const result = await Promise.race([
+        FileSystem.uploadAsync(
+          `${API_BASE}/predict/video?sample_rate=4&overlay=0`,
+          uri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            fieldName: 'video',
+            mimeType: 'video/mp4',
+          },
+        ),
+        // 120 s hard cap — horizontal videos are ~47 MB and take the most time
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('analyzeVideo timeout')), 120000),
+        ),
+      ]);
+
+      if (result.status < 200 || result.status >= 300) {
+        console.log('[VP] API error:', result.status, result.body?.slice(0, 200));
         return null;
       }
-      return await res.json();
+      return JSON.parse(result.body);
     } catch (e) {
-      clearTimeout(timeout);
-      console.log("[VP] analyzeVideo error:", e);
+      console.log('[VP] analyzeVideo error:', e);
       return null;
     }
   };
@@ -688,7 +697,7 @@ export default function VisualPursuit() {
     const computeNystagmus = async (jsonUrl: string): Promise<Record<string, any> | null> => {
       try {
         const jsonController = new AbortController();
-        const jsonTimeout = setTimeout(() => jsonController.abort(), 15000);
+        const jsonTimeout = setTimeout(() => jsonController.abort(), 30000);
         const res = await fetch(jsonUrl, { signal: jsonController.signal });
         clearTimeout(jsonTimeout);
         if (!res.ok) { console.log('[VP] frames.json fetch failed:', res.status); return null; }
@@ -763,10 +772,7 @@ export default function VisualPursuit() {
         return null;
       });
 
-      if (videoUrl) {
-        // Upload confirmed — Firebase returned a download URL, safe to free local storage
-        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-      } else {
+      if (!videoUrl) {
         // Upload failed — queue for automatic retry when connectivity is restored
         await enqueueUpload({
           type: "video",
@@ -781,6 +787,8 @@ export default function VisualPursuit() {
         });
       }
 
+      // Run API analysis BEFORE deleting the local file — analyzeVideo reads the
+      // same uri, and deleting it first caused "Network request failed" errors.
       const apiResult = await analyzeVideo(uri).catch(e => {
         console.log(`[VP] API failed for ${round}:`, e);
         return null;
@@ -790,6 +798,12 @@ export default function VisualPursuit() {
       const nystagmus = apiResult?.json_url
         ? await computeNystagmus(`${API_BASE}${apiResult.json_url}`)
         : null;
+
+      // Safe to delete local file now — upload AND analysis are both done.
+      if (videoUrl) {
+        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      }
+
       return { round, localUri: uri, videoUrl, apiResult, apiSuccess: apiResult !== null, nystagmus };
     };
 
