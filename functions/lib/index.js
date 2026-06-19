@@ -40,7 +40,7 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.fetchEmpaticaData = exports.refetchSession = void 0;
+exports.ensureUserWithEmail = exports.fetchEmpaticaData = exports.refetchSession = void 0;
 const client_s3_1 = require("@aws-sdk/client-s3");
 const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
@@ -375,5 +375,34 @@ exports.fetchEmpaticaData = (0, scheduler_1.onSchedule)({
     const now = Date.now();
     await processIndividualGames(s3, now);
     await processSessionGames(s3, now);
+});
+// ─── Email-only auth helper ───────────────────────────────────────────────────
+// Ensures the account exists with the app's fixed password so the client can
+// sign in with signInWithEmailAndPassword. Only called when direct sign-in
+// fails (new user or account created with a different password).
+// Uses updateUser/createUser — no Service Account Token Creator role needed.
+const APP_PASSWORD = 'sobriety-app-participant';
+exports.ensureUserWithEmail = (0, https_1.onCall)(async (request) => {
+    var _a, _b;
+    const email = ((_b = (_a = request.data) === null || _a === void 0 ? void 0 : _a.email) !== null && _b !== void 0 ? _b : '').trim().toLowerCase();
+    if (!email)
+        throw new Error('Email is required.');
+    try {
+        const user = await admin.auth().getUserByEmail(email);
+        // User exists but sign-in failed — reset password to app default
+        await admin.auth().updateUser(user.uid, { password: APP_PASSWORD });
+        console.log(`[Auth] Reset password for existing user: ${email}`);
+    }
+    catch (e) {
+        if ((e === null || e === void 0 ? void 0 : e.code) === 'auth/user-not-found') {
+            await admin.auth().createUser({ email, password: APP_PASSWORD });
+            console.log(`[Auth] Created new user: ${email}`);
+        }
+        else {
+            console.error(`[Auth] ensureUserWithEmail error for ${email}:`, e);
+            throw e;
+        }
+    }
+    return { success: true };
 });
 //# sourceMappingURL=index.js.map

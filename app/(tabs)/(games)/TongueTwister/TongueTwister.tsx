@@ -4,6 +4,7 @@ import { TongueTwisterHistoryChart } from '@/components/TongueTwisterHistoryChar
 import { EMPATICA_PARTICIPANT } from '@/lib/empaticaConfig';
 import { uploadAudio } from '@/lib/firebaseStorage';
 import { saveGameResult } from '@/lib/firestore';
+import { enqueueUpload } from '@/lib/uploadQueue';
 import { ms, scale } from '@/lib/scale';
 import { useSession } from '@/lib/SessionContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -80,7 +81,7 @@ export default function TongueTwisters() {
   const [apiResponses, setApiResponses] = useState<APIResponse[]>([]);
 
   const router = useRouter();
-  const { sessionMode, completeGame, updateGameResult, addPendingJob, isLastGame, savePartialSession, resetSession } = useSession();
+  const { sessionMode, completeGame, updateGameResult, addPendingJob, isLastGame, savePartialSession, resetSession, getPartialSessionId } = useSession();
 
   // Cleanup recording on unmount
   useEffect(() => {
@@ -170,20 +171,24 @@ export default function TongueTwisters() {
     try {
       setIsAnalyzing(true);
 
-      // Health check
+      // Health check — 5 s timeout so a missing network doesn't block between phrases
       console.log('🏥 Performing health check...');
       try {
-        const healthCheck = await fetch('https://tongue-twister-game-api.ngrok.io/health');
+        const hcController = new AbortController();
+        const hcTimeout = setTimeout(() => hcController.abort(), 5000);
+        const healthCheck = await fetch('https://tongue-twister-game-api.ngrok.io/health', { signal: hcController.signal });
+        clearTimeout(hcTimeout);
         console.log('✅ Health check status:', healthCheck.status);
         if (!healthCheck.ok) {
           throw new Error('API server is not responding to health check');
         }
       } catch (healthErr) {
+        clearTimeout(0); // noop — each timeout is cleared in its own scope above
         console.error('❌ Health check failed:', healthErr);
         throw new Error('Cannot reach API server. It may be offline.');
       }
 
-const audioMeta = getAudioMeta(uri);
+      const audioMeta = getAudioMeta(uri);
       console.log('📍 Audio meta:', audioMeta);
 
       console.log('📦 Creating FormData...');
@@ -191,13 +196,17 @@ const audioMeta = getAudioMeta(uri);
       formData.append('reference_text', referenceText);
       formData.append('audio_file', audioMeta as any);
 
-console.log('✅ FormData created');
-      // Send to API
+      console.log('✅ FormData created');
+      // Send to API — 25 s timeout (audio analysis takes a few seconds)
       console.log('🚀 Sending to API:', API_URL);
+      const apiController = new AbortController();
+      const apiTimeout = setTimeout(() => apiController.abort(), 25000);
       const apiResponse = await fetch(API_URL, {
         method: 'POST',
         body: formData,
+        signal: apiController.signal,
       });
+      clearTimeout(apiTimeout);
 
       console.log('📨 API Response received - Status:', apiResponse.status);
 
@@ -237,14 +246,16 @@ console.log('✅ FormData created');
       console.error('Full error:', err);
       
       setIsAnalyzing(false);
-      
+
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      Alert.alert(
-        'Analysis Failed', 
-        `${errorMessage}\n\nUsing default scores for now.`
+      const isNetworkError = err instanceof Error && (
+        err.name === 'AbortError' || errorMessage.includes('offline') || errorMessage.includes('network')
       );
-      
-      console.log('⚠️ Analysis failed — no fallback scores recorded');
+      // Suppress alert for network/timeout failures — show it only for unexpected errors
+      if (!isNetworkError) {
+        Alert.alert('Analysis Failed', `${errorMessage}\n\nUsing default scores for now.`);
+      }
+      console.log('⚠️ Analysis failed — no fallback scores recorded:', errorMessage);
     }
   };
 
@@ -363,7 +374,12 @@ console.log('✅ FormData created');
       const capturedPhrase = shuffledPhrases[currentIndex];
       const capturedStartTime = gameStartTimeRef.current ?? new Date();
 
-      completeGame('tongue_twister', buildMetrics(responsesBeforeLast), capturedStartTime);
+      // Race against 4 s so no-internet Firestore retries never block navigation.
+      await Promise.race([
+        completeGame('tongue_twister', buildMetrics(responsesBeforeLast), capturedStartTime),
+        new Promise<void>(resolve => setTimeout(resolve, 4000)),
+      ]);
+      const sessionDocId = getPartialSessionId();
       if (isLastGame()) {
         router.replace('/session-results');
       } else {
@@ -381,7 +397,10 @@ console.log('✅ FormData created');
             const formData = new FormData();
             formData.append('reference_text', capturedPhrase);
             formData.append('audio_file', getAudioMeta(capturedUri) as any);
-            const res = await fetch(API_URL, { method: 'POST', body: formData });
+            const bgController = new AbortController();
+            const bgTimeout = setTimeout(() => bgController.abort(), 25000);
+            const res = await fetch(API_URL, { method: 'POST', body: formData, signal: bgController.signal });
+            clearTimeout(bgTimeout);
             if (res.ok) extraResponse = await res.json();
           } catch (e) {
             console.log('[TT] Background last-phrase analysis failed:', e);
@@ -390,12 +409,30 @@ console.log('✅ FormData created');
         const allResponses = extraResponse
           ? [...responsesBeforeLast, extraResponse]
           : responsesBeforeLast;
-        // Upload all phrase recordings
-        const audioUrls = await Promise.all(
-          capturedPhraseUris.map((uri, i) =>
-            uploadAudio(uri, EMPATICA_PARTICIPANT.fullId, capturedPhrases[i] ?? `phrase_${i}`, i).catch(() => null)
-          )
+
+        // Upload each phrase recording — delete local file on success, queue on failure
+        const audioUrls: (string | null)[] = await Promise.all(
+          capturedPhraseUris.map(async (uri, i) => {
+            const url = await uploadAudio(uri, EMPATICA_PARTICIPANT.fullId, capturedPhrases[i] ?? `phrase_${i}`, i).catch(() => null);
+            if (url) {
+              FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+            } else {
+              await enqueueUpload({
+                type: 'audio',
+                localUri: uri,
+                subjectId: EMPATICA_PARTICIPANT.subjectId,
+                participantId: EMPATICA_PARTICIPANT.fullId,
+                gameType: 'tongue_twister',
+                label: capturedPhrases[i] ?? `phrase_${i}`,
+                round: String(i),
+                sessionDocId,
+                recordedAt: new Date().toISOString(),
+              });
+            }
+            return url;
+          })
         );
+
         updateGameResult('tongue_twister', {
           ...buildMetrics(allResponses),
           audioUrls: audioUrls.filter(Boolean),
@@ -422,11 +459,27 @@ console.log('✅ FormData created');
     const finalResponses = apiResponsesRef.current;
     console.log('[TT] Game over — responses collected:', finalResponses.length);
 
-    // Upload all phrase recordings and include URLs in saved result
-    const audioUrls = await Promise.all(
-      phraseUrisRef.current.map((uri, i) =>
-        uploadAudio(uri, EMPATICA_PARTICIPANT.fullId, shuffledPhrases[i] ?? `phrase_${i}`, i).catch(() => null)
-      )
+    // Upload each phrase recording — delete local file on success, queue on failure
+    const audioUrls: (string | null)[] = await Promise.all(
+      phraseUrisRef.current.map(async (uri, i) => {
+        const url = await uploadAudio(uri, EMPATICA_PARTICIPANT.fullId, shuffledPhrases[i] ?? `phrase_${i}`, i).catch(() => null);
+        if (url) {
+          FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        } else {
+          await enqueueUpload({
+            type: 'audio',
+            localUri: uri,
+            subjectId: EMPATICA_PARTICIPANT.subjectId,
+            participantId: EMPATICA_PARTICIPANT.fullId,
+            gameType: 'tongue_twister',
+            label: shuffledPhrases[i] ?? `phrase_${i}`,
+            round: String(i),
+            sessionDocId: null,
+            recordedAt: new Date().toISOString(),
+          });
+        }
+        return url;
+      })
     );
 
     saveGameResult(

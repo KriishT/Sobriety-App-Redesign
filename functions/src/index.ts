@@ -1,7 +1,7 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import * as admin from 'firebase-admin';
 import { defineSecret } from 'firebase-functions/params';
-import { onRequest } from 'firebase-functions/v2/https';
+import { onCall, onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { Readable } from 'stream';
 
@@ -382,3 +382,32 @@ export const fetchEmpaticaData = onSchedule(
     await processSessionGames(s3, now);
   },
 );
+
+// ─── Email-only auth helper ───────────────────────────────────────────────────
+// Ensures the account exists with the app's fixed password so the client can
+// sign in with signInWithEmailAndPassword. Only called when direct sign-in
+// fails (new user or account created with a different password).
+// Uses updateUser/createUser — no Service Account Token Creator role needed.
+const APP_PASSWORD = 'sobriety-app-participant';
+
+export const ensureUserWithEmail = onCall(async (request) => {
+  const email = (request.data?.email ?? '').trim().toLowerCase();
+  if (!email) throw new Error('Email is required.');
+
+  try {
+    const user = await admin.auth().getUserByEmail(email);
+    // User exists but sign-in failed — reset password to app default
+    await admin.auth().updateUser(user.uid, { password: APP_PASSWORD });
+    console.log(`[Auth] Reset password for existing user: ${email}`);
+  } catch (e: any) {
+    if (e?.code === 'auth/user-not-found') {
+      await admin.auth().createUser({ email, password: APP_PASSWORD });
+      console.log(`[Auth] Created new user: ${email}`);
+    } else {
+      console.error(`[Auth] ensureUserWithEmail error for ${email}:`, e);
+      throw e;
+    }
+  }
+  return { success: true };
+});
+

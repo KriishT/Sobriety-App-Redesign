@@ -17,7 +17,12 @@
       "Bash(node -p \"require\\('./package.json'\\).dependencies['react-native']\")",
       "Bash(npx expo *)",
       "Bash(git log *)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(cd \"c:\\\\Users\\\\kriis\\\\OneDrive\\\\Desktop\\\\Sobriety-App-Redesign\\\\functions\" && grep \"onCall\" src/index.ts | head -5 && grep '\"firebase/functions\"' ../package.json)",
+      "Read(//c/Users/kriis/OneDrive/Desktop/**)",
+      "Bash(firebase deploy *)",
+      "Bash(firebase functions:log --only getCustomAuthToken --project sobreity-test)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

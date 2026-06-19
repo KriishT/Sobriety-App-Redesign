@@ -9,21 +9,26 @@ import { scale, ms, vs } from '@/lib/scale';
 
 export default function SignIn() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignIn = async () => {
+    if (!email.trim()) { setError('Please enter your email address.'); return; }
     setError('');
     setLoading(true);
     try {
-      await loginUser(email);
+      await loginUser(email.trim());
       router.replace('/(tabs)/dashboard');
     } catch (e: any) {
-      setError(e?.message ?? 'Sign in failed. Please try again.');
+      const code = e?.code ?? '';
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/invalid-email') {
+        setError('No account found for this email. Please sign up first.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many attempts. Please wait a moment and try again.');
+      } else {
+        setError('Sign in failed. Please check your email and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -45,68 +50,18 @@ export default function SignIn() {
 
         <Text style={styles.title}>Welcome Back</Text>
 
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'email' && styles.activeTab]}
-            onPress={() => setActiveTab('email')}
-          >
-            <Text style={[styles.tabText, activeTab === 'email' && styles.activeTabText]}>
-              Email
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'phone' && styles.activeTab]}
-            onPress={() => setActiveTab('phone')}
-          >
-            <Text style={[styles.tabText, activeTab === 'phone' && styles.activeTabText]}>
-              Phone Number
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.inputContainer}>
+          <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor="#9CA3AF"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
         </View>
-
-        {activeTab === 'email' && (
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-        )}
-
-        {activeTab === 'phone' && (
-          <>
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number"
-                placeholderTextColor="#9CA3AF"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#9CA3AF"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-              />
-            </View>
-          </>
-        )}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 

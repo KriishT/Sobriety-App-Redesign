@@ -1,6 +1,7 @@
 ﻿import { EMPATICA_PARTICIPANT } from "@/lib/empaticaConfig";
 import { uploadVideo } from "@/lib/firebaseStorage";
 import { saveGameResult, updateSessionGameResult } from "@/lib/firestore";
+import { enqueueUpload } from "@/lib/uploadQueue";
 import { useSession } from "@/lib/SessionContext";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -29,7 +30,7 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const BALL_SIZE = 36;
 const BALL_SPEED = 5;
 const BALL_PAUSE_FRAMES = 15; // ~450ms pause at 30ms tick
-const API_BASE = "https://unsoaped-tomas-monarchically.ngrok-free.dev";
+const API_BASE = "https://ubescgazeapi3400.ngrok.pro";
 
 // PiP camera dimensions (fixed — never changes during recording)
 const PIP_W = 88;
@@ -424,7 +425,7 @@ export default function VisualPursuit() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const { sessionMode, completeGame, updateGameResult, addPendingJob, isLastGame, getPartialSessionId } = useSession();
+  const { sessionMode, completeGame, updateGameResult, addPendingJob, isLastGame, getPartialSessionId, savePartialSession, resetSession } = useSession();
   const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<TestPhase>("intro");
   const [ballPosition, setBallPosition] = useState({ x: 0, y: 0 });
@@ -450,6 +451,7 @@ export default function VisualPursuit() {
   const cameraReadyRef = useRef(false);
   const pendingRecordRef = useRef(false);
   const isRunningRef = useRef(false);
+  const sessionAbortedRef = useRef(false); // set by handleBack to stop analyzeAll navigating after a back-out
   const ballXRef = useRef(0);
   const ballYRef = useRef(0);
   const ballStageRef = useRef<BallStage>("to-end");
@@ -489,7 +491,11 @@ export default function VisualPursuit() {
   };
 
   const startRecording = () => {
-    if (!cameraRef.current || !cameraReadyRef.current || isRecordingRef.current) return;
+    console.log(`[VP] startRecording — cameraRef:${!!cameraRef.current} cameraReady:${cameraReadyRef.current} isRecording:${isRecordingRef.current}`);
+    if (!cameraRef.current || !cameraReadyRef.current || isRecordingRef.current) {
+      console.log('[VP] startRecording SKIPPED');
+      return;
+    }
     isRecordingRef.current = true;
     recordingPromiseRef.current = cameraRef.current.recordAsync({ maxDuration: 300 });
     recordingPromiseRef.current.then(
@@ -513,19 +519,24 @@ export default function VisualPursuit() {
   };
 
   const analyzeVideo = async (uri: string): Promise<any> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       const formData = new FormData();
       formData.append("video", { uri, type: "video/mp4", name: "recording.mp4" } as any);
       const res = await fetch(`${API_BASE}/predict/video?sample_rate=4&overlay=0`, {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!res.ok) {
         console.log("[VP] API error:", res.status);
         return null;
       }
       return await res.json();
     } catch (e) {
+      clearTimeout(timeout);
       console.log("[VP] analyzeVideo error:", e);
       return null;
     }
@@ -616,7 +627,9 @@ export default function VisualPursuit() {
   };
 
   const stopAndSaveRound = async (round: RoundKey): Promise<string | null> => {
+    console.log(`[VP] stopAndSaveRound START: ${round} — isRecording:${isRecordingRef.current}`);
     const rawUri = await stopRecording();
+    console.log(`[VP] stopAndSaveRound ${round} — rawUri: ${rawUri ?? 'NULL'}`);
     if (!rawUri) { console.log(`[VP] ${round} — no URI from stopRecording`); return null; }
     // Copy from camera cache to documentDirectory so fetch() can access it for upload
     try {
@@ -650,13 +663,16 @@ export default function VisualPursuit() {
     const roundIndex = ROUND_ORDER.indexOf(round);
     roundStartTimesRef.current[round] = new Date();
     // Phase change moves camera from absoluteFill → pip (layout change).
-    // Wait 50ms for the layout to settle before starting recording to avoid null URI.
+    // Horizontal rounds need extra time — the phone is physically rotated which
+    // can trigger a camera re-initialization, causing recordAsync to miss if we
+    // fire too soon. 200ms is enough for the camera to settle after rotation.
+    const recordDelay = round.startsWith('horizontal') ? 200 : 50;
     setPhase(getRoundTestPhase(round));
     startBallAnimation(round, () => onRoundComplete(roundIndex));
     setTimeout(() => {
       if (cameraReadyRef.current) startRecording();
       else pendingRecordRef.current = true;
-    }, 50);
+    }, recordDelay);
   };
 
   const analyzeAll = async () => {
@@ -671,7 +687,10 @@ export default function VisualPursuit() {
     // the per-frame gaze_offset_px (pupil_center minus iris_center).
     const computeNystagmus = async (jsonUrl: string): Promise<Record<string, any> | null> => {
       try {
-        const res = await fetch(jsonUrl);
+        const jsonController = new AbortController();
+        const jsonTimeout = setTimeout(() => jsonController.abort(), 15000);
+        const res = await fetch(jsonUrl, { signal: jsonController.signal });
+        clearTimeout(jsonTimeout);
         if (!res.ok) { console.log('[VP] frames.json fetch failed:', res.status); return null; }
         const data = await res.json();
         const frames: any[] = data.frames ?? [];
@@ -735,13 +754,33 @@ export default function VisualPursuit() {
 
     // Upload video first (always), then call API, then download frames.json
     // and compute nystagmus — all in sequence so nothing blocks the video save.
-    const uploadRound = async (round: RoundKey) => {
+    // sessionDocId is passed so a failed upload can be queued for automatic retry.
+    const uploadRound = async (round: RoundKey, sessionDocId: string | null) => {
       const uri = capturedUris[round];
       if (!uri) return { round, localUri: null, videoUrl: null, apiResult: null, apiSuccess: false, nystagmus: null };
       const videoUrl = await uploadVideo(uri, EMPATICA_PARTICIPANT.subjectId, "visual_pursuit", round).catch(e => {
         console.log(`[VP] Upload failed for ${round}:`, e);
         return null;
       });
+
+      if (videoUrl) {
+        // Upload confirmed — Firebase returned a download URL, safe to free local storage
+        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      } else {
+        // Upload failed — queue for automatic retry when connectivity is restored
+        await enqueueUpload({
+          type: "video",
+          localUri: uri,
+          subjectId: EMPATICA_PARTICIPANT.subjectId,
+          participantId: EMPATICA_PARTICIPANT.fullId,
+          gameType: "visual_pursuit",
+          label: round,
+          round,
+          sessionDocId,
+          recordedAt: new Date().toISOString(),
+        });
+      }
+
       const apiResult = await analyzeVideo(uri).catch(e => {
         console.log(`[VP] API failed for ${round}:`, e);
         return null;
@@ -754,10 +793,10 @@ export default function VisualPursuit() {
       return { round, localUri: uri, videoUrl, apiResult, apiSuccess: apiResult !== null, nystagmus };
     };
 
-    const uploadAllSequential = async () => {
+    const uploadAllSequential = async (sessionDocId: string | null) => {
       const results = [];
       for (const round of ROUND_ORDER) {
-        results.push(await uploadRound(round));
+        results.push(await uploadRound(round, sessionDocId));
       }
       return results;
     };
@@ -796,24 +835,41 @@ export default function VisualPursuit() {
     };
 
     if (sessionMode === "full_session") {
-      // Await so the partial-session doc is guaranteed to exist (and its ID set)
-      // before we read it below — otherwise, when VP is the first game to complete,
-      // getPartialSessionId() can still return null because the save hasn't resolved.
-      await completeGame("visual_pursuit", { apiSuccess: null }, capturedGameStart);
-      // Capture the partial session doc ID NOW — before the user navigates away and
-      // potentially resets the session context. Video uploads take 30-60 s and the
-      // context may be cleared long before they finish.
-      const sessionDocId = getPartialSessionId();
+      // Race completeGame against a 4 s timeout — with no internet, retryAsync can
+      // block up to 12 s before failing. The sessionQueue catches any failed save,
+      // so navigation must not wait indefinitely for the Firestore write.
+      await Promise.race([
+        completeGame("visual_pursuit", { apiSuccess: null }, capturedGameStart),
+        new Promise<void>(resolve => setTimeout(resolve, 4000)),
+      ]);
+      // If the user pressed back while completeGame was pending, handleBack already
+      // navigated to dashboard and reset the session — don't override that navigation.
+      if (sessionAbortedRef.current) return;
+      // Read the session doc ID — may already be set, or set shortly after if
+      // completeGame is still finishing after the 4 s race timed out.
+      const navSessionDocId = getPartialSessionId();
       if (isLastGame()) { router.replace("/session-results"); }
       else { router.replace("/session-transition"); }
 
       const job = (async (): Promise<void> => {
-        const results = await uploadAllSequential();
+        // If the 4 s timeout fired before completeGame set the partialSessionId,
+        // wait up to 10 more seconds — completeGame is still running asynchronously
+        // and will set it once the Firestore write completes or the sessionQueue
+        // catches the failure and sets a queued ID.
+        let sessionDocId = navSessionDocId;
+        if (!sessionDocId) {
+          for (let i = 0; i < 10; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            sessionDocId = getPartialSessionId();
+            if (sessionDocId) { console.log(`[VP] Got sessionDocId after ${i + 1}s wait`); break; }
+          }
+        }
+
+        const results = await uploadAllSequential(sessionDocId);
         const metrics = buildMetrics(results);
         // Update in-memory context (works if session is still active)
         updateGameResult("visual_pursuit", metrics);
-        // Also patch Firestore directly — this works even if the session was
-        // abandoned and resetSession() has already been called.
+        // Patch Firestore directly — works even after resetSession() has been called.
         if (sessionDocId) {
           await updateSessionGameResult(sessionDocId, "visual_pursuit", metrics);
         }
@@ -822,9 +878,9 @@ export default function VisualPursuit() {
       return;
     }
 
-    // Individual mode — sequential uploads
+    // Individual mode — sequential uploads (no session doc to patch)
     setPhase("analyzing");
-    const results = await uploadAllSequential();
+    const results = await uploadAllSequential(null);
     saveGameResult(
       "visual_pursuit", EMPATICA_PARTICIPANT.fullId, capturedGameStart, new Date(),
       buildMetrics(results),
@@ -851,6 +907,7 @@ export default function VisualPursuit() {
   const gameStartState = async () => {
     if (isRunningRef.current) return;
     isRunningRef.current = true;
+    sessionAbortedRef.current = false;
     cleanup();
     brightnessAnim.setValue(0);
     roundUrisRef.current = { vertical_left: null, vertical_right: null, horizontal_left: null, horizontal_right: null };
@@ -878,9 +935,14 @@ export default function VisualPursuit() {
   const handleBack = () => {
     cleanup();
     isRunningRef.current = false;
+    sessionAbortedRef.current = true;
     brightnessAnim.setValue(0);
     setPhase("intro");
     setRoundResults(null);
+    if (sessionMode === "full_session") {
+      savePartialSession();
+      resetSession();
+    }
     router.replace("/(tabs)/dashboard");
   };
 
@@ -1075,64 +1137,71 @@ export default function VisualPursuit() {
                 <View style={styles.placeholder} />
               </View>
 
-              {/* Dotted center divider with one eye placeholder on each side. The eye being
-                  tested this round gets a solid outline; the other stays dotted. For vertical
-                  rounds the divider/ovals run left-right; for horizontal rounds they run
-                  top-bottom on-screen so they read as left-right once the phone is rotated. */}
-              {/* paddingBottom for horizontal rounds reserves space for the absolutely-
-                  positioned info panel so ovals never overlap with the text/button. */}
-              <View style={[styles.calibSection, isHorizontalAlign && { paddingBottom: ALIGN_PANEL_SIZE + 48 }]}>
-                <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-                  {isHorizontalAlign ? (
-                    <Line
-                      x1="0%" y1="50%" x2="100%" y2="50%"
-                      stroke="#FFFFFF"
-                      strokeWidth={2}
-                      strokeDasharray="6,8"
-                      strokeOpacity={0.5}
-                    />
-                  ) : (
-                    <Line
-                      x1="50%" y1="0%" x2="50%" y2="100%"
-                      stroke="#FFFFFF"
-                      strokeWidth={2}
-                      strokeDasharray="6,8"
-                      strokeOpacity={0.5}
-                    />
-                  )}
-                </Svg>
-                <View style={[styles.calibRow, isHorizontalAlign ? styles.calibRowVertical : styles.calibRowHorizontal]}>
-                  {[calibFirstSide, calibSecondSide].map(side => (
-                    <View key={side} style={styles.calibSide}>
-                      <View
-                        style={[
-                          isVerticalRound(currentRound) ? styles.calibOvalVertical : styles.calibOvalHorizontal,
-                          side === testedSide ? styles.calibOvalSolid : styles.calibOvalDotted,
-                        ]}
-                      />
+              {/* Calibration ovals + divider line.
+                  Vertical rounds: vertical SVG line, ovals left/right (flex row).
+                  Horizontal rounds: all absolute — line at true screen center (y=50%),
+                  active oval centred in top half, inactive oval centred in bottom half
+                  above the instruction strip. No rotation tricks needed. */}
+              <View style={styles.calibSection}>
+                {isHorizontalAlign ? (
+                  <>
+                    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+                      <Line x1="0%" y1="38%" x2="100%" y2="38%" stroke="#FFFFFF" strokeWidth={2} strokeDasharray="6,8" strokeOpacity={0.5} />
+                    </Svg>
+                    {/* Active oval — top half */}
+                    <View style={styles.calibActiveHalf}>
+                      <View style={[styles.calibOvalHorizontal, styles.calibOvalSolid]} />
                     </View>
-                  ))}
-                </View>
+                    {/* Inactive oval — bottom half, above instruction strip */}
+                    <View style={styles.calibInactiveHalf}>
+                      <View style={[styles.calibOvalHorizontal, styles.calibOvalDotted]} />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+                      <Line x1="50%" y1="0%" x2="50%" y2="100%" stroke="#FFFFFF" strokeWidth={2} strokeDasharray="6,8" strokeOpacity={0.5} />
+                    </Svg>
+                    <View style={[styles.calibRow, styles.calibRowHorizontal]}>
+                      {[calibFirstSide, calibSecondSide].map(side => (
+                        <View key={side} style={styles.calibSide}>
+                          <View style={[styles.calibOvalVertical, side === testedSide ? styles.calibOvalSolid : styles.calibOvalDotted]} />
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
               </View>
 
-              {/* Round info + instruction + OK button. Horizontal rounds: rendered as a
-                  fixed square and rotated so it reads correctly once the phone is
-                  physically rotated 90°. Left eye: -90° (phone rotated CW).
-                  Right eye: +90° (phone flipped 180°). */}
-              <View style={[
-                styles.alignBottom,
-                isHorizontalAlign && styles.alignBottomSquare,
-                currentRound === 'horizontal_left'  && styles.alignBottomLandscape,
-                currentRound === 'horizontal_right' && styles.alignBottomLandscapeRight,
-              ]}>
-                <Text style={styles.roundLabel}>{ROUND_LABELS[currentRound]}</Text>
-                <Text style={styles.alignInstruction}>{ROUND_INSTRUCTION[currentRound]}</Text>
-                <Text style={styles.alignSubtext}>{ROUND_DIRECTION[currentRound]}</Text>
-                <TouchableOpacity style={styles.okButton} onPress={onOKPressed}>
-                  <Text style={styles.okButtonText}>OK — Start Round</Text>
-                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
+              {/* Instruction strip + OK button.
+                  Horizontal: absolutely anchored to the bottom of the overlay, portrait
+                  orientation — user reads before rotating the phone. Simple and clean.
+                  Vertical: normal flex child below calibSection. */}
+              {isHorizontalAlign ? (
+                <View style={[
+                  styles.alignBottomHorizontal,
+                  { bottom: 8 + insets.bottom },
+                  currentRound === 'horizontal_left'  && styles.alignBottomLandscape,
+                  currentRound === 'horizontal_right' && styles.alignBottomLandscapeRight,
+                ]}>
+                  <Text style={[styles.roundLabel, { fontSize: 11 }]}>{ROUND_LABELS[currentRound]}</Text>
+                  <Text style={[styles.alignInstruction, { fontSize: 13, paddingHorizontal: 4 }]}>{ROUND_INSTRUCTION[currentRound]}</Text>
+                  <TouchableOpacity style={[styles.okButton, { paddingHorizontal: 20 }]} onPress={onOKPressed}>
+                    <Text style={styles.okButtonText}>OK — Start Round</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.alignBottom}>
+                  <Text style={styles.roundLabel}>{ROUND_LABELS[currentRound]}</Text>
+                  <Text style={styles.alignInstruction}>{ROUND_INSTRUCTION[currentRound]}</Text>
+                  <Text style={styles.alignSubtext}>{ROUND_DIRECTION[currentRound]}</Text>
+                  <TouchableOpacity style={styles.okButton} onPress={onOKPressed}>
+                    <Text style={styles.okButtonText}>OK — Start Round</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
 
@@ -1467,9 +1536,10 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   // Horizontal rounds: divider/ovals run top-bottom on-screen
+  // flex:1 (not height:"100%") so parent paddingBottom is respected in RN
   calibRowVertical: {
     flexDirection: "column",
-    height: "100%",
+    flex: 1,
   },
   calibSide: {
     flex: 1,
@@ -1547,6 +1617,38 @@ const styles = StyleSheet.create({
     height: ALIGN_PANEL_SIZE,
     paddingHorizontal: 16,
     paddingBottom: 0,
+  },
+  // Top half of calibSection — active oval centred here, line sits at its bottom edge
+  // Active oval zone — top 38% of calibSection (closer to camera = user's left after rotation)
+  calibActiveHalf: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: "62%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Inactive oval zone — starts just below the divider (38%), ends above instruction strip
+  // Sits slightly below screen center = slightly to the user's right after rotation
+  calibInactiveHalf: {
+    position: "absolute",
+    top: "43%",
+    left: 0,
+    right: 0,
+    bottom: 160,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Horizontal-round instruction strip — fixed width so the 90° rotation doesn't
+  // overflow into the oval area. Width (pre-rotation) becomes visual height post-rotation.
+  alignBottomHorizontal: {
+    position: "absolute",
+    bottom: 8,
+    alignSelf: "center",
+    width: 160,
+    alignItems: "center",
+    gap: 8,
   },
   roundLabel: {
     fontSize: 12,

@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, doc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { EMPATICA_PARTICIPANT } from './empaticaConfig';
 import { retryAsync } from './retry';
@@ -254,6 +254,42 @@ export async function updateSessionGameResult(
     console.log(`[Firestore] Patched session ${sessionDocId} → games.${gameType}`);
   } catch (e) {
     console.log('[Firestore] updateSessionGameResult error (all retries failed):', e);
+  }
+}
+
+/** Appends a recovered audio URL to the tongue_twister audioUrls array.
+ *  Uses arrayUnion so it's safe to call even if some URLs already exist. */
+export async function patchSessionAudioUrl(
+  sessionDocId: string,
+  audioUrl: string,
+): Promise<void> {
+  try {
+    await retryAsync(() => updateDoc(doc(db, 'sessions', sessionDocId), {
+      'games.tongue_twister.audioUrls': arrayUnion(audioUrl),
+    }), 3, 2000);
+    console.log(`[Firestore] Appended audio URL to tongue_twister.audioUrls`);
+  } catch (e) {
+    console.log('[Firestore] patchSessionAudioUrl error:', e);
+  }
+}
+
+/** Patches only a single round's video URL inside a session document.
+ *  Used by the retry queue — avoids overwriting API results for other rounds. */
+export async function patchSessionVideoUrl(
+  sessionDocId: string,
+  gameType: string,
+  round: string,
+  videoUrl: string,
+): Promise<void> {
+  try {
+    await retryAsync(() => updateDoc(doc(db, 'sessions', sessionDocId), {
+      [`games.${gameType}.videoUrls.${round}`]: videoUrl,
+      [`games.${gameType}.rounds.${round}.videoUrl`]: videoUrl,
+      [`games.${gameType}.rounds.${round}.localUri`]: null,
+    }), 3, 2000);
+    console.log(`[Firestore] Patched video URL: ${gameType}.${round}`);
+  } catch (e) {
+    console.log('[Firestore] patchSessionVideoUrl error:', e);
   }
 }
 

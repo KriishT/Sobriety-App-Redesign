@@ -15,13 +15,19 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = async () => {
+    if (!email.trim()) { setError('Please enter your email address.'); return; }
     setError('');
     setLoading(true);
     try {
-      await registerUser(email);
+      await registerUser(email.trim());
       router.replace('/(tabs)/dashboard');
     } catch (e: any) {
-      setError(e?.message ?? 'Registration failed. Please try again.');
+      const code = e?.code ?? '';
+      if (code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

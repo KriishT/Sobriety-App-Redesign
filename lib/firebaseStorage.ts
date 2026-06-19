@@ -16,14 +16,21 @@ async function nativeUpload(
   const encodedPath = encodeURIComponent(storagePath);
   const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o?uploadType=media&name=${encodedPath}`;
 
-  const result = await FileSystem.uploadAsync(uploadUrl, localUri, {
-    httpMethod: 'POST',
-    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    headers: {
-      ...(token ? { Authorization: `Firebase ${token}` } : {}),
-      'Content-Type': contentType,
-    },
-  });
+  // FileSystem.uploadAsync has no built-in timeout — race against 60 s so retryAsync
+  // can actually retry instead of waiting indefinitely when internet is gone.
+  const result = await Promise.race([
+    FileSystem.uploadAsync(uploadUrl, localUri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        ...(token ? { Authorization: `Firebase ${token}` } : {}),
+        'Content-Type': contentType,
+      },
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Upload timeout after 60s')), 60000)
+    ),
+  ]);
 
   if (result.status < 200 || result.status >= 300) {
     throw new Error(`Upload HTTP ${result.status}: ${result.body.slice(0, 200)}`);
@@ -69,11 +76,12 @@ export async function uploadAudio(
     const safeName = phrase.replace(/[^a-z0-9]/gi, '_').slice(0, 30);
     const path = `audio/${participantId}/tongue_twister/${index}_${safeName}_${timestamp}.m4a`;
     console.log(`[Storage] Uploading audio: ${path}`);
-    const url = await nativeUpload(localUri, path, 'audio/m4a');
+    // Retry on transient failures — same protection as video uploads.
+    const url = await retryAsync(() => nativeUpload(localUri, path, 'audio/m4a'), 3, 2000);
     console.log(`[Storage] Audio uploaded: ${url}`);
     return url;
   } catch (e) {
-    console.log('[Storage] Audio upload error:', e);
+    console.log('[Storage] Audio upload error (all retries failed):', e);
     return null;
   }
 }

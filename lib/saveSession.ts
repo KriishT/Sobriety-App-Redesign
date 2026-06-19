@@ -13,7 +13,9 @@ export async function saveSession(
   gameTimes: Record<string, string> = {},
   status: 'complete' | 'partial' = 'complete',
   gameQueue: string[] = [],
-  existingDocId?: string,   // If set, updates the existing doc instead of creating a new one
+  existingDocId?: string,
+  // Pass true when called from the retry queue to prevent re-queuing on failure
+  _isRetry = false,
 ): Promise<string | null> {
   try {
     const gamesOut: Record<string, any> = {};
@@ -62,20 +64,33 @@ export async function saveSession(
       for (const [k, v] of Object.entries(games as Record<string, any>)) {
         dotGames[`games.${k}`] = v;
       }
-      // Retry on transient failures so a dropped connection doesn't lose this session save.
-      await retryAsync(() => updateDoc(doc(db, 'sessions', existingDocId), { ...rest, ...dotGames }), 3, 2000);
+      // Single attempt with a fast 3 s timeout — if Firestore isn't reachable,
+      // fail quickly and let the sessionQueue retry when internet is back.
+      // This keeps the session-complete screen's "saving" spinner to < 5 s.
+      await retryAsync(() => updateDoc(doc(db, 'sessions', existingDocId), { ...rest, ...dotGames }), 1, 500);
       console.log('[Session] Updated session:', existingDocId);
+      // Clear any queued entries for this session — save succeeded so they'd create duplicates.
+      const { clearSessionFromQueue } = await import('./sessionQueue');
+      await clearSessionFromQueue(participantId, startTime.toISOString());
       return existingDocId;
     } else {
       const docRef = await retryAsync(() => addDoc(collection(db, 'sessions'), {
         ...data,
         createdAt: serverTimestamp(),
-      }), 3, 2000);
+      }), 1, 500);
       console.log('[Session] Saved session:', docRef.id);
+      const { clearSessionFromQueue } = await import('./sessionQueue');
+      await clearSessionFromQueue(participantId, startTime.toISOString());
       return docRef.id;
     }
   } catch (e) {
-    console.log('[Session] Save error:', e);
+    console.log('[Session] Save error (all retries failed):', e);
+    if (!_isRetry) {
+      // Queue for retry on next app open or reconnect.
+      // Skipped when called from processSessionQueue to avoid duplicate entries.
+      const { enqueueSession } = await import('./sessionQueue');
+      await enqueueSession(participantId, startTime, endTime, results, gameTimes, status, gameQueue, existingDocId);
+    }
     return null;
   }
 }

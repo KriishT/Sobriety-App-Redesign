@@ -4,8 +4,8 @@ import { EMPATICA_PARTICIPANT } from '@/lib/empaticaConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { scale, ms, vs } from '@/lib/scale';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const GAME_ICONS: Record<string, string> = {
@@ -93,32 +93,67 @@ function formatMetricKey(key: string): string {
 
 export default function SessionResults() {
   const router = useRouter();
-  const { sessionResults, sessionGameTimes, sessionStartTime, gameQueue, resetSession, awaitAllPendingJobs, hasPendingJobs, partialSessionId, getSessionResults } = useSession();
-  const [saveState, setSaveState] = useState<'pending' | 'saving' | 'saved' | 'error'>('pending');
+  const { sessionGameTimes, sessionStartTime, gameQueue, resetSession, partialSessionId, getSessionResults } = useSession();
+  const [saveState, setSaveState] = useState<'saving' | 'saved' | 'error'>('saving');
+  const [saveLabel, setSaveLabel] = useState('Saving to database...');
+  const savedResultsRef = useRef<Record<string, any>>({});
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [displayPct, setDisplayPct] = useState(0);
 
-  // Auto-save as soon as this screen mounts (after any background analysis jobs finish).
-  // This way the session is in Firestore even if the user closes the app without tapping the button.
   useEffect(() => {
-    setSaveState('saving');
-    awaitAllPendingJobs()          // wait for VP / TT background analysis if still running
-      .then(() => saveSession(
-        EMPATICA_PARTICIPANT.fullId,
-        sessionStartTime ?? new Date(),
-        new Date(),
-        getSessionResults(),       // read live results — background jobs may have updated these
-        sessionGameTimes,
-        'complete',
-        gameQueue,
-        partialSessionId ?? undefined,
-      ))
-      .then(() => setSaveState('saved'))
-      .catch(e => {
-        console.log('[SessionResults] Auto-save error:', e);
+    // Listen to the animated value to drive the percentage display
+    const id = progressAnim.addListener(({ value }) => setDisplayPct(Math.round(value)));
+    return () => progressAnim.removeListener(id);
+  }, []);
+
+  useEffect(() => {
+    // Capture everything NOW before any resetSession() call can clear the refs.
+    savedResultsRef.current = getSessionResults();
+    const capturedStartTime = sessionStartTime ?? new Date();
+    const capturedGameTimes = { ...sessionGameTimes };
+    const capturedGameQueue = [...gameQueue];
+    const capturedPartialId = partialSessionId ?? undefined;
+
+    // Animate bar from 0 → 85 % while the save is in progress
+    Animated.timing(progressAnim, {
+      toValue: 85,
+      duration: 1200,
+      useNativeDriver: false,
+    }).start();
+
+    saveSession(
+      EMPATICA_PARTICIPANT.fullId,
+      capturedStartTime,
+      new Date(),
+      savedResultsRef.current,
+      capturedGameTimes,
+      'complete',
+      capturedGameQueue,
+      capturedPartialId,
+    )
+      .then(id => {
+        const online = !!id;
+        setSaveLabel(online ? 'Saved to database ✓' : 'Saved locally — will sync when online ✓');
+        setSaveState(online ? 'saved' : 'error');
+        // Snap to 100 % on completion
+        Animated.timing(progressAnim, {
+          toValue: 100,
+          duration: 400,
+          useNativeDriver: false,
+        }).start();
+      })
+      .catch(() => {
+        setSaveLabel('Saved locally — will sync when online ✓');
         setSaveState('error');
+        Animated.timing(progressAnim, { toValue: 100, duration: 400, useNativeDriver: false }).start();
       });
+
+    return () => { resetSession(); };
   }, []);
 
   const handleReturn = () => {
+    // resetSession() is also called by the useEffect cleanup on unmount,
+    // but calling it here first ensures it runs before router.replace fires.
     resetSession();
     router.replace('/(tabs)/dashboard');
   };
@@ -145,7 +180,7 @@ export default function SessionResults() {
         </View>
 
         {gameQueue.map((gameKey) => {
-          const metrics = sessionResults[gameKey];
+          const metrics = savedResultsRef.current[gameKey];
           const icon = GAME_ICONS[gameKey] ?? 'game-controller-outline';
           const name = GAME_NAMES[gameKey] ?? gameKey;
           const metricKeys = GAME_KEY_METRICS[gameKey] ?? [];
@@ -191,58 +226,36 @@ export default function SessionResults() {
           );
         })}
 
-        {/* Save status indicator */}
-        <View style={styles.saveStatus}>
-          {saveState === 'saving' && (
-            <>
-              <ActivityIndicator size="small" color="#6366F1" />
-              <Text style={styles.saveStatusText}>Saving session...</Text>
-            </>
-          )}
-          {saveState === 'saved' && (
-            <>
-              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-              <Text style={[styles.saveStatusText, { color: '#10B981' }]}>Session saved</Text>
-            </>
-          )}
-          {saveState === 'error' && (
-            <>
-              <Ionicons name="warning-outline" size={18} color="#EF4444" />
-              <Text style={[styles.saveStatusText, { color: '#EF4444' }]}>Save failed — tap below to retry</Text>
-            </>
-          )}
+        {/* Progress bar — 0→100 % whether saving online or queuing locally */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>{saveLabel}</Text>
+            <Text style={styles.progressPct}>{displayPct}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[
+                styles.progressFill,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ['0%', '100%'],
+                  }),
+                  backgroundColor: saveState === 'error' ? '#F59E0B' : '#6366F1',
+                },
+              ]}
+            />
+          </View>
         </View>
 
+        {/* Button unlocks at 100 % (when saveState is no longer 'saving') */}
         <TouchableOpacity
           style={[styles.saveButton, saveState === 'saving' && styles.saveButtonDisabled]}
-          onPress={saveState === 'error' ? () => {
-            setSaveState('saving');
-            saveSession(
-              EMPATICA_PARTICIPANT.fullId,
-              sessionStartTime ?? new Date(),
-              new Date(),
-              sessionResults,
-              sessionGameTimes,
-              'complete',
-              gameQueue,
-              partialSessionId ?? undefined,
-            ).then(() => setSaveState('saved')).catch(() => setSaveState('error'));
-          } : handleReturn}
+          onPress={handleReturn}
           disabled={saveState === 'saving'}
         >
-          {saveState === 'saving' ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : saveState === 'error' ? (
-            <>
-              <Ionicons name="refresh" size={20} color="#FFFFFF" />
-              <Text style={styles.saveButtonText}>Retry Save</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="home-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.saveButtonText}>Return to Dashboard</Text>
-            </>
-          )}
+          <Ionicons name="home-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.saveButtonText}>Return to Dashboard</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -323,6 +336,27 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  progressSection: {
+    marginBottom: 16,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressLabel: { fontSize: 13, fontWeight: '500', color: '#6B7280', flex: 1 },
+  progressPct: { fontSize: 13, fontWeight: '700', color: '#6366F1' },
+  progressTrack: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
   saveStatus: {
     flexDirection: 'row',
     alignItems: 'center',

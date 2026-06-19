@@ -2,9 +2,12 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, View } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
+import NetInfo from '@react-native-community/netinfo';
 import { onAuthChanged } from '@/lib/auth';
 import { SessionProvider, useSession } from '@/lib/SessionContext';
 import { ParticipantProvider, useParticipant } from '@/lib/ParticipantContext';
+import { processQueue } from '@/lib/uploadQueue';
+import { processSessionQueue } from '@/lib/sessionQueue';
 import type { User } from 'firebase/auth';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -15,7 +18,39 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { savePartialSession, sessionMode } = useSession();
 
   useEffect(() => {
-    const unsub = onAuthChanged((u) => setUser(u));
+    const unsub = onAuthChanged((u) => {
+      setUser(u);
+      // Process queues as soon as auth is confirmed — ensures auth.currentUser is
+      // set when saveSession runs, so userUid is correct and Firestore rules pass.
+      if (u) {
+        setTimeout(async () => {
+          // Sessions first — creates the Firestore docs and links sessionDocIds
+          // into the upload queue so videos/audio can patch the correct doc.
+          await processSessionQueue();
+          processQueue();
+        }, 1000);
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Also process queues whenever internet is restored.
+  // Use isConnected only — isInternetReachable is unreliable on Android
+  // (returns null even when internet is working), which would block the queue.
+  useEffect(() => {
+    let lastConnected = false;
+    const unsub = NetInfo.addEventListener(state => {
+      const connected = state.isConnected === true;
+      if (connected && !lastConnected) {
+        // Delay by 3 s so reconnect processing doesn't saturate the JS event loop
+        // mid-game (e.g. during VP ball animation or TT recording).
+        setTimeout(async () => {
+          await processSessionQueue();
+          processQueue();
+        }, 3000);
+      }
+      lastConnected = connected;
+    });
     return unsub;
   }, []);
 
@@ -25,6 +60,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const path = segments.join('/');
+      if (path === 'session-results') {
+        // Let session-results handle its own cleanup via useEffect return.
+        // Just navigate — the unmount cleanup calls resetSession().
+        router.replace('/(tabs)/dashboard');
+        return true;
+      }
       if (path.includes('(games)')) {
         if (sessionMode === 'full_session') savePartialSession();
         router.replace('/(tabs)/dashboard');

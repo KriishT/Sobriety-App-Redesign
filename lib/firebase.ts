@@ -1,7 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -14,8 +15,16 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db      = getFirestore(app);
-export const auth    = initializeAuth(app, {
+
+// Memory cache: Firestore writes survive connectivity drops within the same
+// app session. IndexedDB-based persistence isn't available in React Native,
+// so videos/audio use the separate AsyncStorage upload queue for durability.
+export const db = initializeFirestore(app, {
+  localCache: memoryLocalCache(),
+});
+
+export const auth      = initializeAuth(app, {
   persistence: getReactNativePersistence(ReactNativeAsyncStorage),
 });
-export const storage = getStorage(app);
+export const storage   = getStorage(app);
+export const functions = getFunctions(app);
