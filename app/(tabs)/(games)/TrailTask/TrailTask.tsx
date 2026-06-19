@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
+import TrailTaskDemo from './TrailTaskDemo';
 
 const { width } = Dimensions.get('window');
 const CANVAS_WIDTH = width - 40;
@@ -313,12 +314,13 @@ export default function TrailMaking() {
 
             {/* Step illustration */}
             <Image source={TRT_INSTR} style={styles.trtInstImg} resizeMode="contain" />
+            <TrailTaskDemo />
 
             {/* Tip */}
-            <View style={styles.trtTipBox}>
+            {/* <View style={styles.trtTipBox}>
               <Ionicons name="time-outline" size={20} color="#F59E0B" style={{ marginBottom: 6 }} />
               <Text style={styles.trtTipText}>Speed & Accuracy determine your score.</Text>
-            </View>
+            </View> */}
 
             {/* Warning */}
             <View style={styles.trtWarningBox}>

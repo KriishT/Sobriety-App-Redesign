@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChoiceReactionDemo } from './ChoiceReactionDemo';
 
 const SCREEN_W = Dimensions.get('window').width;
 // const CR_INSTR = require('@/assets/inst_images/CR_instr.jpg');
@@ -266,7 +267,7 @@ export default function ChoiceReaction() {
 
             {/* Step illustration */}
             <Image source={CR_INSTR} style={styles.crInstImg} resizeMode="contain" />
-
+            <ChoiceReactionDemo />
             {/* Tips */}
             <View style={styles.tipsBox}>
               <Ionicons name="information-circle" size={20} color="#10B981" style={{ marginBottom: 8 }} />
@@ -280,7 +281,7 @@ export default function ChoiceReaction() {
                 </View>
               ))}
             </View>
-
+            
             <TouchableOpacity style={styles.startButton} onPress={() => setCountdown(true)}>
               <Text style={styles.startButtonText}>Begin Test</Text>
               <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />

@@ -1,7 +1,7 @@
 ﻿import { Countdown } from '@/components/Countdown';
 import { ScoreTrendCard } from '@/components/ScoreTrendCard';
-import { saveGameResult } from '@/lib/firestore';
 import { EMPATICA_PARTICIPANT } from '@/lib/empaticaConfig';
+import { saveGameResult } from '@/lib/firestore';
 import { useSession } from '@/lib/SessionContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,9 +17,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { scale, ms, vs } from '@/lib/scale';
 import Svg, { Circle, Line } from 'react-native-svg';
-
+import DSSTDemo from './DSSTDemo';
 const { width } = Dimensions.get('window');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -472,7 +471,7 @@ export default function DSST() {
               </View>
             ))}
           </View>
-
+          <DSSTDemo />
           {/* Tips */}
           <View style={s.rulesCard}>
             <Ionicons name="information-circle" size={20} color="#8B5CF6" style={{ marginBottom: 8 }} />
@@ -495,6 +494,7 @@ export default function DSST() {
         {countdown && (
           <Countdown onComplete={() => { setCountdown(false); startGame(); }} />
         )}
+       
       </SafeAreaView>
     );
   }
@@ -553,9 +553,9 @@ export default function DSST() {
             currentMetrics={{ score, accuracy: acc, totalAttempts }}
           />
 
-          <TouchableOpacity style={s.startBtn} onPress={() => setCountdown(true)}>
+          <TouchableOpacity style={s.retryButton} onPress={() => setCountdown(true)}>
             <Ionicons name="refresh" size={20} color="#FFF" />
-            <Text style={s.startBtnText}>Try Again</Text>
+            <Text style={s.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.ghostBtn} onPress={handleBackToDashboard}>
             <Text style={s.ghostBtnText}>Back to Dashboard</Text>
@@ -760,6 +760,22 @@ const s = StyleSheet.create({
   ruleRow:    { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
   bullet:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8B5CF6', marginTop: 6, marginRight: 10 },
   ruleText:   { flex: 1, fontSize: 13, color: '#6B7280', lineHeight: 19 },
+
+  retryButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#8B5CF6",
+  paddingVertical: 16,
+  paddingHorizontal: 32,
+  borderRadius: 12,
+  marginBottom: 16,
+},
+retryButtonText: {
+  fontSize: 16,
+  fontWeight: "600",
+  color: "#FFFFFF",
+  marginLeft: 8,
+},
 
   startBtn:   {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
