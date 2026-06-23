@@ -30,6 +30,12 @@ const { width: SCREEN_W } = Dimensions.get("window");
 const BALL_SIZE = 36;
 const BALL_SPEED = 5;
 const BALL_PAUSE_FRAMES = 15; // ~450ms pause at 30ms tick
+const VERTICAL_TOP_Y = 0;
+const VERTICAL_BOTTOM_MARGIN = 12; // rest position near bottom — longer upward sweep for nystagmus
+
+function getVerticalRestY(canvasHeight: number) {
+  return Math.max(VERTICAL_TOP_Y, canvasHeight - BALL_SIZE - VERTICAL_BOTTOM_MARGIN);
+}
 const API_BASE = "https://ubescgazeapi3400.ngrok.pro";
 
 // PiP camera dimensions (fixed — never changes during recording)
@@ -70,8 +76,8 @@ const ROUND_INSTRUCTION: Record<RoundKey, string> = {
 };
 
 const ROUND_DIRECTION: Record<RoundKey, string> = {
-  vertical_left:    "Ball: CENTER → UP → CENTER",
-  vertical_right:   "Ball: CENTER → UP → CENTER",
+  vertical_left:    "Ball: BOTTOM → UP → BOTTOM",
+  vertical_right:   "Ball: BOTTOM → UP → BOTTOM",
   horizontal_left:  "Ball: TOP → BOTTOM → TOP",
   horizontal_right: "Ball: TOP → BOTTOM → TOP",
 };
@@ -572,10 +578,10 @@ export default function VisualPursuit() {
     ballCycleRef.current = 0; // reset — will complete after 2 full round-trips
 
     if (vertical) {
-      const centerY = canvasHeightRef.current / 2 - BALL_SIZE / 2;
+      const restY = getVerticalRestY(canvasHeightRef.current);
       ballXRef.current = centerX;
-      ballYRef.current = centerY;
-      setBallPosition({ x: centerX, y: centerY });
+      ballYRef.current = restY;
+      setBallPosition({ x: centerX, y: restY });
     } else {
       ballXRef.current = centerX;
       ballYRef.current = 0;
@@ -591,27 +597,25 @@ export default function VisualPursuit() {
       const cx = canvasWidthRef.current / 2 - BALL_SIZE / 2;
 
       if (vertical) {
-        const centerY = canvasHeightRef.current / 2 - BALL_SIZE / 2;
+        const restY = getVerticalRestY(canvasHeightRef.current);
 
         if (ballStageRef.current === "to-end") {
-          // Moving up to top
-          ballYRef.current = Math.max(0, ballYRef.current - BALL_SPEED);
-          if (ballYRef.current <= 0) {
+          // Moving up from lower rest position to top of canvas
+          ballYRef.current = Math.max(VERTICAL_TOP_Y, ballYRef.current - BALL_SPEED);
+          if (ballYRef.current <= VERTICAL_TOP_Y) {
             pauseFramesRef.current = BALL_PAUSE_FRAMES;
             ballStageRef.current = "to-start";
           }
         } else {
-          // Returning to center
-          ballYRef.current = Math.min(centerY, ballYRef.current + BALL_SPEED);
-          if (ballYRef.current >= centerY) {
+          // Returning to lower rest position
+          ballYRef.current = Math.min(restY, ballYRef.current + BALL_SPEED);
+          if (ballYRef.current >= restY) {
             ballCycleRef.current += 1;
             if (ballCycleRef.current >= 2) {
-              // Both sweeps done
               stopAnimation();
               onComplete();
               return;
             }
-            // Start second sweep — brief pause at center before going again
             pauseFramesRef.current = BALL_PAUSE_FRAMES;
             ballStageRef.current = "to-end";
           }
