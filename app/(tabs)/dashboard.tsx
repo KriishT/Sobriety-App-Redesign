@@ -247,7 +247,7 @@ export default function Dashboard() {
               <View style={styles.verifyWarn}>
                 <Ionicons name="alert-circle" size={16} color="#B45309" />
                 <Text style={styles.verifyWarnText}>
-                  Participant ID is missing or invalid. Go to Settings to set it.
+                  Invalid Participant ID or Watch Serial Number. Please update this information in Settings.
                 </Text>
               </View>
             )}
