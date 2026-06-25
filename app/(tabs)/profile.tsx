@@ -3,7 +3,7 @@ import { setActiveParticipant } from '@/lib/empaticaConfig';
 import { useParticipant } from '@/lib/ParticipantContext';
 import { parseParticipantConfig, saveParticipantConfig } from '@/lib/participantConfig';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { scale, ms, vs } from '@/lib/scale';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -24,6 +24,7 @@ import type { User } from 'firebase/auth';
 
 export default function Profile() {
   const router = useRouter();
+  const { expandConfig } = useLocalSearchParams<{ expandConfig?: string }>();
   const { config, refresh } = useParticipant();
 
   const [user, setUser] = useState<User | null>(null);
@@ -36,6 +37,11 @@ export default function Profile() {
     const unsub = onAuthChanged(u => setUser(u));
     return unsub;
   }, []);
+
+  // Auto-expand the Empatica Configuration section when arriving via "Go to Settings".
+  useEffect(() => {
+    if (expandConfig) setConfigExpanded(true);
+  }, [expandConfig]);
 
   // Sync fields when config loads/changes
   useEffect(() => {

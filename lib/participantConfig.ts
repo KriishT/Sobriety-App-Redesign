@@ -53,19 +53,3 @@ export function isParticipantConfigValid(config: ParticipantConfig | null | unde
   if (!config.serialNumber?.trim()) return false;
   return parseParticipantConfig(config.fullId, config.serialNumber) !== null;
 }
-
-/**
- * Parses a watch activation QR string such as `2872-1-1-01-3YK9T1L181` into the
- * two fields the setup screen expects. The last `-` segment is the watch serial
- * number; everything before it is the participant Full ID.
- */
-export function parseWatchQrCode(raw: string): { fullId: string; serialNumber: string } | null {
-  const parts = raw.trim().split('-');
-  // Need at least the 4-segment Full ID (org-site-participant-num) plus a serial.
-  if (parts.length < 5) return null;
-  const serialNumber = parts[parts.length - 1].trim().toUpperCase();
-  const fullId = parts.slice(0, -1).join('-');
-  if (!serialNumber) return null;
-  if (!parseParticipantConfig(fullId, serialNumber)) return null;
-  return { fullId, serialNumber };
-}

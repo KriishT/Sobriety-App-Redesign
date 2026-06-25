@@ -54,7 +54,8 @@ export default function Dashboard() {
 
   const handleGoToSettings = () => {
     setVerifyVisible(false);
-    router.push('/(tabs)/profile' as any);
+    // Pass a changing value so Profile re-expands the config section every time.
+    router.push({ pathname: '/(tabs)/profile', params: { expandConfig: String(Date.now()) } } as any);
   };
 
   const handleContinueSession = () => {
