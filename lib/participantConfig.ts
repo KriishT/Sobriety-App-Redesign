@@ -42,14 +42,3 @@ export async function loadParticipantConfig(): Promise<ParticipantConfig | null>
 export async function clearParticipantConfig(): Promise<void> {
   await AsyncStorage.removeItem(STORAGE_KEY);
 }
-
-/**
- * True only when a config exists and its Full ID / serial are present and in a
- * parseable Empatica format. Used to decide whether to prompt the participant.
- */
-export function isParticipantConfigValid(config: ParticipantConfig | null | undefined): boolean {
-  if (!config) return false;
-  if (!config.fullId?.trim()) return false;
-  if (!config.serialNumber?.trim()) return false;
-  return parseParticipantConfig(config.fullId, config.serialNumber) !== null;
-}

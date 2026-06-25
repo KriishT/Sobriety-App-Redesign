@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSession, GAME_ROUTES, GAME_NAMES } from '@/lib/SessionContext';
 import { fetchLatestPartialSession, abandonPartialSession, PartialSessionDoc } from '@/lib/firestore';
 import { useParticipant } from '@/lib/ParticipantContext';
-import { isParticipantConfigValid, saveParticipantConfig } from '@/lib/participantConfig';
+import { saveParticipantConfig } from '@/lib/participantConfig';
 import { scale, ms, vs } from '@/lib/scale';
 
 const games = [
@@ -57,6 +57,8 @@ export default function Dashboard() {
     // Pass a changing value so Profile re-expands the config section every time.
     router.push({ pathname: '/(tabs)/profile', params: { expandConfig: String(Date.now()) } } as any);
   };
+
+  const idMissing = !config?.fullId || !config?.serialNumber;
 
   const handleContinueSession = () => {
     if (!partialSession) return;
@@ -241,7 +243,7 @@ export default function Dashboard() {
               </View>
             </View>
 
-            {!isParticipantConfigValid(config) && (
+            {idMissing && (
               <View style={styles.verifyWarn}>
                 <Ionicons name="alert-circle" size={16} color="#B45309" />
                 <Text style={styles.verifyWarnText}>
@@ -256,9 +258,9 @@ export default function Dashboard() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.verifySaveButton, !isParticipantConfigValid(config) && styles.verifySaveDisabled]}
+              style={[styles.verifySaveButton, idMissing && styles.verifySaveDisabled]}
               onPress={handleConfirmId}
-              disabled={!isParticipantConfigValid(config)}
+              disabled={idMissing}
             >
               <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
               <Text style={styles.verifySaveText}>Save</Text>
