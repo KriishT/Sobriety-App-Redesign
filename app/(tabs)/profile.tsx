@@ -1,15 +1,17 @@
 ﻿import { logoutUser, onAuthChanged } from '@/lib/auth';
 import { setActiveParticipant } from '@/lib/empaticaConfig';
-import { useParticipant } from '@/lib/ParticipantContext';
 import { parseParticipantConfig, saveParticipantConfig } from '@/lib/participantConfig';
+import { useParticipant } from '@/lib/ParticipantContext';
+import { scale } from '@/lib/scale';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { scale, ms, vs } from '@/lib/scale';
 import { StatusBar } from 'expo-status-bar';
+import type { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,7 +22,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { User } from 'firebase/auth';
 
 export default function Profile() {
   const router = useRouter();
@@ -60,12 +61,12 @@ export default function Profile() {
       );
       return;
     }
+    Keyboard.dismiss(); // blur inputs so the cursor stops blinking after saving
     setSaving(true);
     await saveParticipantConfig(parsed);
     setActiveParticipant(parsed);
     await refresh();
     setSaving(false);
-    setConfigExpanded(false);
     Alert.alert('Saved', 'Empatica configuration updated.');
   };
 

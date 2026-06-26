@@ -222,10 +222,10 @@ export default function Dashboard() {
             <View style={styles.verifyIconWrap}>
               <Ionicons name="watch-outline" size={32} color="#6366F1" />
             </View>
-            <Text style={styles.verifyTitle}>Verify Participant ID</Text>
+            <Text style={styles.verifyTitle}>Confirm Your Assigned Info</Text>
             <Text style={styles.verifySubtitle}>
-              Please confirm these match your watch before testing. If correct, tap Save. If not,
-              go to Profile to update them.
+              Please confirm that the Participant ID and Watch Serial Number below match your
+              assigned device.
             </Text>
 
             <View style={styles.verifyValues}>
@@ -266,6 +266,7 @@ export default function Dashboard() {
               <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
               <Text style={styles.verifySaveText}>Confirm</Text>
             </TouchableOpacity>
+            
           </View>
         </View>
       </Modal>
